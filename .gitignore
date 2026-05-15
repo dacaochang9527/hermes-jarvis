@@ -1,0 +1,43 @@
+# --- Secrets & environment (never commit) ---
+.env
+.env.*
+!.env.example
+
+# --- Runtime logs & history ---
+logs/
+*.log
+interrupt_debug.log
+.hermes_history
+.update_check
+
+# --- Personal / chat state ---
+sessions/
+memories/
+
+# --- Local locks ---
+auth.lock
+
+# --- Config often contains API keys & endpoints (add a redacted example separately if needed) ---
+config.yaml
+config.yaml.bak*
+
+# --- Cache & Skills Hub local state ---
+models_dev_cache.json
+skills/.hub/
+skills/.bundled_manifest
+skills/.curator_state
+
+# --- Python & heavy deps under hermes-agent ---
+hermes-agent/venv/
+hermes-agent/.venv/
+hermes-agent/**/__pycache__/
+hermes-agent/**/*.py[cod]
+hermes-agent/.pytest_cache/
+hermes-agent/node_modules/
+hermes-agent/hermes_cli/web_dist/
+
+# --- Nested Git metadata backup (keep local only; do not push) ---
+hermes-agent/.git.embedded-backup/
+
+# --- OS ---
+.DS_Store
