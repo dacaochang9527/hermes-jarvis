@@ -130,31 +130,34 @@ D1 质量字段用于给 D2/D3 后续阶段参考：
    - 负责读取数据源、调用规则执行器、写出 CSV/Markdown；
    - 不应成为唯一保存规则的地方。
 
-### D1 → D2 → D3 推荐执行流
+### D1 → D2 → D3 阶段流转与职责边界
 
-```text
-1. D1 收盘后：
-   scripts/select_d1_pool.py
-   → data/watchlists/MMDDD1_filtered_HHMMSS.csv
-   → reports/daily/MMDDD1_filtered_HHMMSS.md
+这里描述的是“阶段产物如何流转”，不是新增规则所有者，也不是要求每天复制一个新的独立规则脚本。规则分工仍以上一节为准：
 
-2. D2 收盘后：
-   读取 MMDDD1_filtered_*.csv
-   应用 D2 确认规则：量能不过2倍、冲高回落、未破D1支撑、形态评分
-   → data/watchlists/MMDDD3_scan_HHMMSS.csv
-   → reports/daily/MMDDD3_scan_HHMMSS.md
+- 本 reference 只定义 D1/D2/D3 的规则口径；
+- `src/stock_assistant/strategy_tulong.py` 只负责执行可复用规则；
+- `scripts/tulong/selection/*.py` 只能作为流程编排入口：拉取数据、调用 `strategy_tulong.py`、写出 CSV/Markdown。
 
-3. 夜间人工窄化：
-   按“低吸可执行性 AND 强势潜质”分层
-   → 核心D3观察 / D3强势确认观察 / 低频备选 / 剔除 / 持仓区
-   → data/watchlists/MMDDD3_watch_manual_review_HHMMSS.csv
+因此，生成 D1/D2/D3 产物时，无论入口脚本叫什么，都必须满足：
 
-4. 次日开盘前：
-   preopen_rotate_watchlist 合并 D3/D4/position 源文件
-   → data/watchlists/tulong_active_watchlist.csv
-```
+1. **D1 收盘后**
+   - 从当日涨停池拉取数据，例如 `ak.stock_zt_pool_em(date=D1_DATE)`；
+   - 调用 `strategy_tulong.py` 的 D1 过滤函数；
+   - 只落盘 D1 底池，不做 D2 形态判断；
+   - D1 产物归属到对应 D3 扫描链路：例如 `0527D1` 对应 `0529D3_D1_filtered_YYYYMMDD_HHMMSS.csv/.md`，表示“这份 D1 过滤结果服务于 0529D3 扫描链路”。
+2. **D2 收盘后**
+   - 读取已落盘的 `{D3_LABEL}_D1_filtered_*.csv`，或在同一个参数化入口中复用同一套 D1 过滤结果；
+   - 再调用 `strategy_tulong.py` 的 D2 确认规则：量能不过 2 倍、冲高回落、未破 D1 支撑、形态评分；
+   - 输出 `data/watchlists/MMDDD3_scan_YYYYMMDD_HHMMSS.csv` 和 `reports/daily/MMDDD3_scan_YYYYMMDD_HHMMSS.md`。
+3. **夜间人工窄化**
+   - 按“低吸可执行性 AND 强势潜质”分层；
+   - 输出核心 D3 观察、D3 强势确认观察、低频备选、剔除、持仓区；
+   - 用户确认后落盘为 `data/watchlists/MMDDD3_watch_manual_review_YYYYMMDD_HHMMSS.csv`。
+4. **次日开盘前**
+   - `preopen_rotate_watchlist` 合并 D3/D4/position 源文件；
+   - 写入实际监控池 `data/watchlists/tulong_active_watchlist.csv`。
 
-文件命名建议：D1 底池文件用 `MMDDD1_filtered_YYYYMMDD_HHMMSS`，不要命名成 `MMDDD3_D1_filtered`；D3 扫描或观察文件再使用 `MMDDD3_*`，这样后续引用关系更清楚。
+命名纪律：当前屠龙流程不使用独立 `MMDDD1_filtered_*` 分支。明确某天 D1 时，应按交易日推导对应 D3 标签并命名为 `{D3_LABEL}_D1_filtered_*`；例如 `0527D1` 固定对应 `0529D3_D1_filtered_*`。不要把命名问题误判为规则所有权问题：无论入口脚本如何编排，D1 过滤规则都不能写进一次性脚本，必须调用 `strategy_tulong.py`。
 
 ## D1/D2 筛选和形态质量
 

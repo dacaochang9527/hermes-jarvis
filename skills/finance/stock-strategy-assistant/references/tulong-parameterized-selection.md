@@ -62,7 +62,7 @@ Keep old dated scripts temporarily as historical references or move them to `leg
 
 - Keep pure helpers testable: `parse_yyyymmdd`, `infer_d3_label`, `parse_args`, `build_output_paths`.
 - Use `Path(__file__).resolve().parents[3]` or another repo-relative approach instead of hardcoding the user's absolute project root inside the reusable generator.
-- Keep D1-only output and D1+D2 candidate generation in one script when they share the same source date and output label; this prevents D1 and D3 outputs from drifting.
+- Keep D1-only output and D1+D2 candidate generation in one parameterized orchestration entry when they share the same source date and D3 target label; this prevents D1 and D3 outputs from drifting. The `{D3_LABEL}_D1_filtered_*` file is a D3 scan companion artifact, not a separate owner of D1 rules.
 - The production `runtime/` scripts should not import dated selection scripts. Selection outputs become watchlist inputs only after explicit review/copy/rotation.
 
 ## Rule implementation boundary
