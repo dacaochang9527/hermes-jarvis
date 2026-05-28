@@ -13,7 +13,7 @@
 - `0527D3候选区`：5 月 27 日当天正处 D3 观察/低吸窗口；不要再命名为“低吸池”。
 - `0526D3走强 → 0527D4强势雷达`：D3 当天涨停、强势未板、强回收或突破前高，次日转入 D4 强势雷达。
 - `0526D3人工复盘补充 → 0527D4强势雷达`：D4 不只来自程序化 D3 流转；若收盘/夜间复盘手动指定 D4 股票，也必须落盘为 `MMDDD4_*_HHMMSS.csv`，否则新会话和开盘切池会丢失上下文。
-- D3/D4 观察和持仓源文件落盘时，文件名尾部必须带 6 位时分秒时间戳，并显式包含分区：`MMDDD3_watch_<原因>_HHMMSS.csv`、`MMDDD3_position_<原因>_HHMMSS.csv`、`MMDDD4_watch_<原因>_HHMMSS.csv`、`MMDDD4_position_<原因>_HHMMSS.csv`。其中 `<原因>`（如 `scan`、`manual_review`、`position_rollover`）只用于人类理解这次改动来源；监控池选择数据源时按 `MMDDD3/MMDDD4 + pool_type + HHMMSS` 取每类最新。自 0528 起不再兜底无时间戳旧文件；找不到新格式文件时必须失败提醒，而不是静默使用旧格式。
+- D3/D4 观察和持仓源文件落盘时，文件名尾部必须带年月日+时分秒时间戳，并显式包含分区：`MMDDD3_watch_<原因>_YYYYMMDD_HHMMSS.csv`、`MMDDD3_position_<原因>_YYYYMMDD_HHMMSS.csv`、`MMDDD4_watch_<原因>_YYYYMMDD_HHMMSS.csv`、`MMDDD4_position_<原因>_YYYYMMDD_HHMMSS.csv`。其中 `<原因>`（如 `scan`、`manual_review`、`position_rollover`）只用于人类理解这次改动来源；监控池选择数据源时按 `MMDDD3/MMDDD4 + pool_type + YYYYMMDD_HHMMSS` 取每类最新。不要再生成或依赖仅带 `HHMMSS` 的新文件；看文件名尾部时间戳就应能判断哪个更新。找不到新格式文件时必须失败提醒，而不是静默使用旧格式。
 - `0526D3未走强 → 0527删除`：前一日 D3 没走强，次日不再留在候选区。
 - `0527新D3候选区`：5 月 27 日新生成的当天 D3 票。
 
@@ -57,17 +57,27 @@ D3 当天统一称为 **D3 候选区**，不是“低吸池”。D3 候选区不
 
 跨池去重与点位有效性：
 
-- 夜间确认次日 `MMDDD3观察区` 时，必须先读取已确认/已落盘的 `MMDDD4_watch_*_HHMMSS.csv` 与 `MMDDD4_position_*_HHMMSS.csv`。如果同一只票同时满足新 D3 扫描和既有 D4 观察/持仓，默认保留在 D4，不重复放入 D3；除非用户明确要求双标签跟踪。
+- 夜间确认次日 `MMDDD3观察区` 时，必须先读取已确认/已落盘的 `MMDDD4_watch_*_YYYYMMDD_HHMMSS.csv` 与 `MMDDD4_position_*_YYYYMMDD_HHMMSS.csv`。如果同一只票同时满足新 D3 扫描和既有 D4 观察/持仓，默认保留在 D4，不重复放入 D3；除非用户明确要求双标签跟踪。
 - D3 观察区生成后要检查 `zone_low <= zone_high`。若 `max(invalid*1.015, trigger*0.985) > trigger*1.003` 导致观察区倒挂，说明触发价离失效位太近或点位不舒服，应降为备选/剔除，而不是直接进入高频监控。
 - 次日 D3 与次日 D4 同时存在时，用户可见结论要分开写：先说明 D4 已落盘状态，再单独给 D3 初选/建议名单，避免把 D3 低吸观察与 D4 强势观察混成一个池。
+
+## D1/D2 过滤规则术语
+
+术语要收敛，避免同一类规则在文档、代码和回复中出现多个近义词。统一使用：
+
+- `D1过滤规则`
+- `D2过滤规则`
+- `D1/D2过滤规则`
+
+不要混用“硬过滤”“硬条件”“基础风险过滤”等说法。若需要区分具体内容，直接写规则项本身，例如“主板10cm、非ST、首板、D2量能不过2倍、D2冲高回落、D2收盘不破D1支撑”。
 
 ## D1 首板底池规则与落盘职责
 
 D1 是后续 D2/D3 的输入底池，必须先作为独立阶段落盘，不要把 D1 过滤、D2 确认、D3 人工窄化混在同一个临时判断里。
 
-### D1 硬过滤
+### D1 过滤规则
 
-输入通常来自当日涨停池，例如 `ak.stock_zt_pool_em(date=D1_DATE)`。D1 底池只做“首板资格 + 基础风险过滤”，不做 D2 形态判断。
+输入通常来自当日涨停池，例如 `ak.stock_zt_pool_em(date=D1_DATE)`。D1 底池只应用 D1 过滤规则，不做 D2 形态判断。
 
 保留条件：
 
@@ -109,12 +119,13 @@ D1 质量字段用于给 D2/D3 后续阶段参考：
 
 1. **Skill/reference = 规则说明书**
    - 维护在本文件；
-   - 说明 D1 定义、硬过滤、质量评分、人工校正口径；
+   - 说明 D1 定义、D1过滤规则、质量评分、人工校正口径；
    - 给人和 agent 对齐判断标准。
 2. **`src/stock_assistant/strategy_tulong.py` = 规则执行器**
    - 实现可复用函数，例如 `is_main_board_10cm()`、`is_excluded_name()`、`is_first_board_from_zt_row()`、`evaluate_d1_board()`；
    - 返回结构化结果：`passed/reject_reason/d1_quality_score/d1_quality_notes` 等；
-   - 所有脚本都应调用这里，不要在临时脚本里复制硬编码规则。
+   - 所有脚本都应调用这里，不要在临时脚本里复制硬编码规则；
+   - 若发现 `scripts/tulong/selection/generate_d3_candidates.py` 内仍保存 `EXCLUDE_PREFIXES`、`EXCLUDE_NAME_PARTS` 或 D1 过滤规则函数，应优先用 TDD 将其下沉到本模块，再让脚本只做 CLI/data IO/write outputs。
 3. **`scripts/*.py` = 流程编排器**
    - 负责读取数据源、调用规则执行器、写出 CSV/Markdown；
    - 不应成为唯一保存规则的地方。
@@ -143,14 +154,14 @@ D1 质量字段用于给 D2/D3 后续阶段参考：
    → data/watchlists/tulong_active_watchlist.csv
 ```
 
-文件命名建议：D1 底池文件用 `MMDDD1_filtered_HHMMSS`，不要命名成 `MMDDD3_D1_filtered`；D3 扫描或观察文件再使用 `MMDDD3_*`，这样后续引用关系更清楚。
+文件命名建议：D1 底池文件用 `MMDDD1_filtered_YYYYMMDD_HHMMSS`，不要命名成 `MMDDD3_D1_filtered`；D3 扫描或观察文件再使用 `MMDDD3_*`，这样后续引用关系更清楚。
 
 ## D1/D2 筛选和形态质量
 
 推荐流程：
 
 1. 明确交易日：D1=上上个交易日首板，D2=上个交易日确认，D3=今天观察；遇到周一/节假日必须按真实交易日回退。
-2. 先跑硬条件：D1 首板、排除 ST/退市/20cm/不适合标的、D2 量能不过 2 倍、D2 有冲高回落、D2 收盘不破 D1 支撑。
+2. 执行 D1/D2 过滤规则：D1 首板、排除 ST/退市/20cm/不适合标的、D2 量能不过 2 倍、D2 有冲高回落、D2 收盘不破 D1 支撑。
 3. 再做软评分：D1 封板时间、炸板次数、封板资金；D2 量比、回落幅度、安全垫、成交额、换手率、是否仍大涨。
 
 形态补充：
@@ -174,7 +185,7 @@ D1 质量字段用于给 D2/D3 后续阶段参考：
 6. **拥挤度**：成交额过大或过热时不要只当备注，应正式降权；对 D3 低吸观察，成交适中且可跟踪更优。
 7. **人工分时校正**：若用户根据分时图纠正接口字段（如“实际没有明显炸板”），应修正判断并在落盘 note 中保留校正原因。
 
-输出时先给“核心观察区”和“边缘第 N 只/低频观察”，等用户确认后再落成 `MMDDD3_watch_manual_review_HHMMSS.csv`。
+输出时先给“核心观察区”和“边缘第 N 只/低频观察”，等用户确认后再落成 `MMDDD3_watch_manual_review_YYYYMMDD_HHMMSS.csv`。
 
 ## D3 盘中人工补票与“强提醒追高票”例外
 
@@ -188,7 +199,7 @@ D1 质量字段用于给 D2/D3 后续阶段参考：
    - `trigger_price` 优先用 D2 高点/前高/盘中高点等强势确认位；
    - `zone_low/zone_high` 用接近突破/回收区，例如前高下方一段到前高；
    - `invalid_price` 不宜贴着当前价或昨收，否则脚本会立刻报“跌破止损”；应使用当日关键承接位、D2 收盘下方的确认失效位或用户认可的更紧失败线，并在 `note` 写明“跌回某价下方降级”。
-4. **必须同步两个文件**：同时更新人工源文件（如 `MMDDD3_watch_manual_review_HHMMSS.csv`）和实际 active 池 `data/watchlists/tulong_active_watchlist.csv`；只改 active 会导致次日/新会话丢失，只改源文件会导致当前 watchdog 不生效。
+4. **必须同步两个文件**：同时更新人工源文件（如 `MMDDD3_watch_manual_review_YYYYMMDD_HHMMSS.csv`）和实际 active 池 `data/watchlists/tulong_active_watchlist.csv`；只改 active 会导致次日/新会话丢失，只改源文件会导致当前 watchdog 不生效。
 5. **清理状态避免误判**：清除该代码在 `sent`、`last_prices` 中的旧状态；如果刚用错误点位触发过合成验证提醒，修正点位后也要清掉该代码当天的 sent key，避免真正触发时被去重吞掉。
 6. **验证用户可见文本**：运行脚本级验证或生成一次 `FORCE_RUN=1` 输出，确认单股行显示正确 `stage`、行业、状态、买点/强提醒区、失效线；如果立即显示“跌破止损”，优先复核 `invalid_price` 是否设置过紧。
 
@@ -385,7 +396,7 @@ preopen_guard_check         09:05 每交易日执行，成功静默，失败 std
 推荐实现职责：
 
 1. `preopen_rotate_watchlist`
-   - 查找今日 `MMDDD3_watch_*_HHMMSS.csv`、`MMDDD3_position_*_HHMMSS.csv`、`MMDDD4_watch_*_HHMMSS.csv`、`MMDDD4_position_*_HHMMSS.csv`，每类按显式 `HHMMSS` 取最新；中间 `<原因>` 只作为改动来源，不参与优先级；自 0528 起不再兜底无时间戳旧名，找不到任何新格式文件就失败提醒；
+   - 查找今日 `MMDDD3_watch_*_YYYYMMDD_HHMMSS.csv`、`MMDDD3_position_*_YYYYMMDD_HHMMSS.csv`、`MMDDD4_watch_*_YYYYMMDD_HHMMSS.csv`、`MMDDD4_position_*_YYYYMMDD_HHMMSS.csv`，每类按显式 `YYYYMMDD_HHMMSS` 取最新；中间 `<原因>` 只作为改动来源，不参与优先级；自 0528 起不再兜底无时间戳旧名，找不到任何新格式文件就失败提醒；
    - 合并写入实际监控池 `data/watchlists/tulong_active_watchlist.csv`；
    - active CSV 字段至少包含：`code`、`name`、`industry`、`stage`、`pool_type`、`source_file`、`trigger_price`、`invalid_price`、`zone_low`、`zone_high`、`rank`、`score`、`note`；持仓行还必须包含 `entry_date`、`entry_stage`、`entry_price`、`quantity`、`sellable_quantity`、`cost_amount`、`position_status`；
    - 过滤用户无权限的 20cm / 非沪深主板：`300/301/688/689`、北交所等；
@@ -412,10 +423,10 @@ preopen_guard_check         09:05 每交易日执行，成功静默，失败 std
 当用户在夜间复盘中确认次日 `MMDDD3/MMDDD4` 的观察区或持仓区名单时，不能只在聊天中复述“已确认”。如果用户明确说“新会话还要继承/明天监控/是否落盘”，必须立即核对或生成对应源文件：
 
 1. 每个分区都要有独立源文件：
-   - 观察区：`MMDDD3_watch_*_HHMMSS.csv` / `MMDDD4_watch_*_HHMMSS.csv`；
-   - 持仓区：`MMDDD3_position_*_HHMMSS.csv` / `MMDDD4_position_*_HHMMSS.csv`。
+   - 观察区：`MMDDD3_watch_*_YYYYMMDD_HHMMSS.csv` / `MMDDD4_watch_*_YYYYMMDD_HHMMSS.csv`；
+   - 持仓区：`MMDDD3_position_*_YYYYMMDD_HHMMSS.csv` / `MMDDD4_position_*_YYYYMMDD_HHMMSS.csv`。
 2. 不要把“实际 active 池里已有持仓”误判为“观察区也已落盘”。必须分别检查 watch 与 position 两类文件。
-3. 不要把前一日旧强势雷达文件（如 `0527D4_strong_radar_*`）当成次日已确认观察区。用户夜间人工剔除/保留后的结果必须另存为次日 `MMDDD4_watch_manual_review_HHMMSS.csv`。
+3. 不要把前一日旧强势雷达文件（如 `0527D4_strong_radar_*`）当成次日已确认观察区。用户夜间人工剔除/保留后的结果必须另存为次日 `MMDDD4_watch_manual_review_YYYYMMDD_HHMMSS.csv`。
 4. 如果聊天里已经确认了名单但文件不存在，应直接说明“未完全落盘”，列出已落盘/未落盘分区，并请求或执行落盘；不要告诉用户新会话可以可靠继承。
 5. 落盘后要读回校验：代码列表、`stage`、`pool_type`、`source_file`、关键点位字段、20cm 过滤，以及是否误包含已剔除票。
 

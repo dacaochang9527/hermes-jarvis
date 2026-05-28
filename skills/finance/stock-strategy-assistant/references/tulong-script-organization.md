@@ -94,7 +94,7 @@ Keep the split clear: project README documents â€œhow this repo currently runsâ€
 
 ## Related references
 
-- `references/tulong-parameterized-selection.md`: how to convert dated one-off D3 selection scripts into a reusable `generate_d3_candidates.py` CLI with `--d1-date/--d2-date/--d3-date/--d3-label` and timestamped outputs.
+- `references/tulong-parameterized-selection.md`: how to convert dated one-off D3 selection scripts into a reusable `generate_d3_candidates.py` CLI with `--d1-date/--d2-date/--d3-date/--d3-label` and `YYYYMMDD_HHMMSS` timestamped outputs.
 
 ## Pitfalls from prior session
 

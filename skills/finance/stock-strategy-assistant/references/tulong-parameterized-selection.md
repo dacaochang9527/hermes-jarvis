@@ -32,7 +32,7 @@ CLI shape:
   --d1-date 20260527 \
   --d2-date 20260528 \
   --d3-date 20260529 \
-  --timestamp 214437 \
+  --timestamp 20260529_214437 \
   --d1-only
 ```
 
@@ -42,7 +42,7 @@ Arguments:
 - `--d2-date YYYYMMDD`: D2 confirmation date used for daily bar lookup.
 - `--d3-date YYYYMMDD`: optional; derive `MMDDD3`, e.g. `20260529 -> 0529D3`.
 - `--d3-label 0529D3`: optional explicit label; required if `--d3-date` is omitted.
-- `--timestamp HHMMSS`: optional deterministic output suffix; default current time.
+- `--timestamp YYYYMMDD_HHMMSS`: optional deterministic output suffix; default current date and time.
 - `--max-candidates`: rows in watch CSV.
 - `--max-report`: candidates shown in Markdown.
 - `--d1-only`: also emit D1-only filtered report/CSV.
@@ -50,10 +50,10 @@ Arguments:
 Output naming:
 
 ```text
-reports/daily/{D3_LABEL}_candidate_scan_{HHMMSS}.md
-data/watchlists/{D3_LABEL}_watch_scan_{HHMMSS}.csv
-reports/daily/{D3_LABEL}_D1_filtered_{HHMMSS}.md        # when --d1-only
-data/watchlists/{D3_LABEL}_D1_filtered_{HHMMSS}.csv     # when --d1-only
+reports/daily/{D3_LABEL}_candidate_scan_{YYYYMMDD_HHMMSS}.md
+data/watchlists/{D3_LABEL}_watch_scan_{YYYYMMDD_HHMMSS}.csv
+reports/daily/{D3_LABEL}_D1_filtered_{YYYYMMDD_HHMMSS}.md        # when --d1-only
+data/watchlists/{D3_LABEL}_D1_filtered_{YYYYMMDD_HHMMSS}.csv     # when --d1-only
 ```
 
 Keep old dated scripts temporarily as historical references or move them to `legacy/`; do not keep copying new dated scripts.
@@ -67,7 +67,9 @@ Keep old dated scripts temporarily as historical references or move them to `leg
 
 ## Rule implementation boundary
 
-D1 hard-filter rules must not live only inside the selection CLI. The reusable generator may orchestrate data fetching and file output, but rule predicates should be imported from `src/stock_assistant/strategy_tulong.py`.
+Use the vocabulary `D1 filtering rules`, `D2 filtering rules`, or `D1/D2 filtering rules` consistently. Do not introduce near-synonyms such as `hard-filter`, `hard conditions`, or `basic risk filter` for the same concept; if precision is needed, list the concrete rule items instead.
+
+D1/D2 filtering rules must not live only inside the selection CLI. The reusable generator may orchestrate data fetching and file output, but rule predicates should be imported from `src/stock_assistant/strategy_tulong.py`.
 
 If a generator contains helpers such as:
 
@@ -79,13 +81,42 @@ def is_d1_main_board_first_limit(row): ...
 
 refactor them downward into `strategy_tulong.py`, then update the generator to call the shared function. Add tests in `tests/test_tulong.py` or a nearby test file for:
 
-- main-board 10cm passes;
-- `300/301/688/689/8/4` prefixes reject;
+- main-board 10cm passes via a positive allowlist (`600/601/603/605` and `000/001/002/003`), not only a negative exclude list;
+- `300/301/688/689/8/4/9` prefixes reject;
 - ST / *ST / 退 names reject;
 - `涨停统计` starts with `1/` or `连板数 == 1` passes;
 - non-first-board rows reject with a readable reason.
 
+Implementation pitfall: after moving helpers, search the selection script for old rule ownership markers (`EXCLUDE_PREFIXES`, `EXCLUDE_NAME_PARTS`, `is_d1_main_board_first_limit`) and remove them. Also avoid leaving unused negative-prefix constants in `strategy_tulong.py`; the durable rule should be “only known 沪深主板 10cm prefixes pass,” with tests covering stray prefixes such as `920`.
+
 After this refactor, update project docs (`scripts/tulong/README.md`) and the relevant skill reference in the same change. Do not leave documentation saying the implementation lives in the selection script.
+
+## Rule implementation boundary
+
+Do not let `generate_d3_candidates.py` become the long-term owner of D1/D2 strategy rules. The generator may temporarily contain glue logic while migrating, but durable rule implementation should live in:
+
+```text
+src/stock_assistant/strategy_tulong.py
+```
+
+Recommended split:
+
+- `tulong-d3-d4-monitoring.md`: human/agent rule口径（D1过滤规则、D1质量评分、D2确认、D3分层）。
+- `src/stock_assistant/strategy_tulong.py`: reusable rule functions and structured results.
+- `scripts/tulong/selection/generate_d3_candidates.py`: CLI parsing, data loading, calling rule functions, writing CSV/Markdown.
+
+Timestamp convention: all generated CSV/Markdown outputs should use `YYYYMMDD_HHMMSS` in filenames, not bare `HHMMSS`, so files with the same stage prefix remain globally sortable by filename. Preopen rotation should choose latest source files by the full `YYYYMMDD_HHMMSS` suffix and ignore legacy bare-`HHMMSS` sources for latest-file selection.
+
+When moving D1 filtering down from selection script to `strategy_tulong.py`, add tests first. Minimum target functions:
+
+```python
+is_main_board_10cm(code: str) -> bool
+is_excluded_name(name: str) -> bool
+is_first_board_from_zt_row(row) -> tuple[bool, str]
+evaluate_d1_board(row) -> D1Evaluation
+```
+
+The selection generator should import these helpers instead of keeping its own `EXCLUDE_PREFIXES`, `EXCLUDE_NAME_PARTS`, or `is_d1_main_board_first_limit()` copies. This prevents the script, src module, and skill reference from becoming three divergent sources of truth.
 
 ## Cleanup rule
 
@@ -112,7 +143,7 @@ Minimum tests:
 
 - explicit `--d1-date/--d2-date/--d3-label` parsing;
 - `--d3-date` infers `MMDDD3`;
-- output paths include `{D3_LABEL}` and `{timestamp}`.
+- output paths include `{D3_LABEL}` and `{YYYYMMDD_HHMMSS}` timestamp.
 
 Run:
 
