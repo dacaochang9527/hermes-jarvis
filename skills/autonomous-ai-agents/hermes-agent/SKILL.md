@@ -224,6 +224,10 @@ hermes claw migrate         Migrate from OpenClaw
 hermes uninstall            Uninstall Hermes
 ```
 
+### Persistent Personal Workflows
+
+For user-specific long-running interaction protocols, use a small memory entry as the trigger/index and a class-level skill as the executable procedure. Example: `long-term-interview` stores the user's wish for a switchable interview mode in memory, while the skill defines trigger phrases, question cadence, storage files, privacy boundaries, and how to distinguish facts from hypotheses. Do not put long protocols or raw interview content into memory; keep raw material in local notes and write only stable, user-confirmed conclusions to memory.
+
 ---
 
 ## Slash Commands (In-Session)
@@ -343,6 +347,24 @@ $HERMES_HOME/skills/        Installed skills
 ```
 
 Profiles use `~/.hermes/profiles/<name>/` with the same layout.
+
+### Migrating or Syncing to Another Computer
+
+When a user asks whether to install Hermes on a second machine and “sync the current assistant/config”, recommend selective migration rather than blindly copying all of `~/.hermes`.
+
+Good default workflow:
+
+1. Install Hermes fresh on the new machine and run `hermes setup` + `hermes doctor`.
+2. Copy only the durable, useful state if they want the same behavior/persona:
+   - `~/.hermes/config.yaml` for model/provider/tool/display/memory settings.
+   - `~/.hermes/.env` for API keys and platform tokens; treat as secrets and use encrypted/manual transfer.
+   - `~/.hermes/skills/` for reusable procedures and user-specific workflows.
+   - `~/.hermes/auth.json` if they want to carry OAuth/credential-pool state, while warning that some providers may still require re-login.
+3. Usually skip `~/.hermes/logs/` and the source checkout `~/.hermes/hermes-agent/`; reinstall or update normally unless there are local code changes.
+4. Treat `~/.hermes/sessions/` as optional: copy only if the user wants session search/history on the new machine.
+5. For messaging gateways, especially Weixin/WeChat/iLink, decide which machine is the gateway host. Avoid running the same Weixin gateway credentials on multiple machines at once because it can cause duplicate delivery, conflicts, or confusing authorization state. A second machine can use Hermes locally without copying Weixin authorization.
+
+If the user wants the second computer to “be the same assistant” in chat/memory terms, prioritize config + skills + memory/auth state. If they only need local CLI task execution, a fresh setup plus provider credentials is usually enough.
 
 ### Config Sections
 
@@ -834,7 +856,14 @@ Common gateway problems:
 ### Platform-specific issues
 - **Discord bot silent**: Must enable **Message Content Intent** in Bot → Privileged Gateway Intents.
 - **Slack bot only works in DMs**: Must subscribe to `message.channels` event. Without it, the bot ignores public channels.
+- **Weixin / WeChat setup via gateway**: `hermes gateway setup` may default to `Done` or hide QR output in PTY-driven agent sessions. If the menu is hard to drive, have the user run setup directly in their terminal while you interpret prompts/logs, or use the Tencent iLink QR endpoints documented in `references/weixin-gateway-qr-setup.md`. A running gateway only proves the service is alive — verify Weixin is configured by checking logs for `✓ weixin connected` and `Gateway running with 1 platform(s)`, not merely `hermes gateway status`.
+- **Weixin pairing display names**: `hermes pairing` supports list/approve/revoke/clear-pending but not rename. The `Name` column comes from the approved pairing JSON `user_name`; see `references/weixin-gateway-qr-setup.md` before editing it manually.
+- **Weixin missing replies / iLink rate limits**: If the user asks "微信又没返回" or "可以了吗", actively verify rather than only explain: check gateway status, inspect the newest logs, distinguish model/API failure from send delivery failure, list the Weixin DM target, and send one short test message. A successful `send_message` return with `message_id` is evidence the current send path works. See `references/weixin-ilink-rate-limits.md` for the recovery checklist and pacing mitigations.
 - **Windows-specific issues** (`Alt+Enter` newline, WinError 10106, UTF-8 BOM config, test suite, line endings): see the dedicated **Windows-Specific Quirks** section above.
+
+### Auxiliary vision with custom OpenAI-compatible providers
+
+When Hermes main chat works through a custom/OpenAI-compatible provider but `vision_analyze` fails, do not assume the model lacks image support. First compare any known-good sibling client config, especially OpenClaw's `~/.openclaw/openclaw.json`, for the same provider/model and `input: ["text", "image"]` capability. If logs show `resolve_provider_client: custom/main requested but no endpoint credentials found` or `Vision provider main unavailable`, configure `auxiliary.vision` explicitly to the named provider with model, base_url, and API key/key env rather than relying on `provider: main`. See `references/vision-custom-provider-troubleshooting.md` for the diagnostic pattern, config shape, and verification recipe.
 
 ### Auxiliary models not working
 If `auxiliary` tasks (vision, compression, session_search) fail silently, the `auto` provider can't find a backend. Either set `OPENROUTER_API_KEY` or `GOOGLE_API_KEY`, or explicitly configure each auxiliary task's provider:

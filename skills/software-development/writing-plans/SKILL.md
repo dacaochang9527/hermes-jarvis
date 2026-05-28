@@ -282,16 +282,8 @@ When executing, use the `subagent-driven-development` skill:
 - Code quality review after spec passes
 - Proceed only when both reviews approve
 
-## Remember
+## Session-Specific References
 
-```
-Bite-sized tasks (2-5 min each)
-Exact file paths
-Complete code (copy-pasteable)
-Exact commands with expected output
-Verification steps
-DRY, YAGNI, TDD
-Frequent commits
-```
+- `references/a-share-stock-signal-assistant.md` — 个人 A 股中短线/屠龙战术信号助手的 MVP 架构、策略规则化、东方财富 JSON 解析与安全边界。
 
 **A good plan makes implementation obvious.**

@@ -192,6 +192,10 @@ Propose 2-4 candidates as Given/When/Then. Let the user pick.
 - `README.md` per spike captures question, approach, results, verdict
 - Keep the code throwaway — a spike that takes 2 days to "clean up for production" was a bad spike
 
+## Reference Notes
+
+- `references/a-share-data-source-fallbacks.md` — A股历史日线数据源降级经验：东方财富接口在浏览器可访问但 CLI/自动化失败时，如何切换 AkShare 新浪日线源、处理 Tushare 权限、并用正反案例验证策略。
+
 ## Attribution
 
 Adapted from the GSD (Get Shit Done) project's `/gsd-spike` workflow — MIT © 2025 Lex Christopherson ([gsd-build/get-shit-done](https://github.com/gsd-build/get-shit-done)). The full GSD system offers persistent spike state, MANIFEST tracking, and integration with a broader spec-driven development pipeline; install with `npx get-shit-done-cc --hermes --global`.

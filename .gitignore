@@ -17,6 +17,32 @@ memories/
 # --- Local locks ---
 auth.lock
 
+# --- SQLite session store (local runtime) ---
+state.db
+state.db-shm
+state.db-wal
+
+# --- Gateway / auth runtime ---
+auth.json
+gateway.lock
+gateway.pid
+gateway_state.json
+kanban.db
+.restart_last_processed.json
+channel_directory.json
+processes.json
+cron/.tick.lock
+cron/output/
+pairing/
+lsp/
+user-notes/
+weixin/
+
+# --- Skills Hub / curator runtime ---
+skills/.usage.json
+skills/.usage.json.lock
+skills/.curator_backups/
+
 # --- Config often contains API keys & endpoints (add a redacted example separately if needed) ---
 config.yaml
 config.yaml.bak*
