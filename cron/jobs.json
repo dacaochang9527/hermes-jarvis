@@ -1,0 +1,181 @@
+{
+  "jobs": [
+    {
+      "id": "454b84308082",
+      "name": "A\u80a1\u5c60\u9f99D3\u76d8\u4e2d\u76d1\u63a7",
+      "prompt": "",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "tulong_watchdog.sh",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "* 9-14 * * 1-5",
+        "display": "* 9-14 * * 1-5"
+      },
+      "schedule_display": "* 9-14 * * 1-5",
+      "repeat": {
+        "times": null,
+        "completed": 890
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-05-25T08:15:12.530807+08:00",
+      "next_run_at": "2026-05-29T09:00:00+08:00",
+      "last_run_at": "2026-05-28T14:59:59.833824+08:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "weixin",
+        "chat_id": "o9cq80wN6U9Yq2exTAaqwvmfV7UQ@im.wechat",
+        "chat_name": null,
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "/Users/fenomenoronaldo/Documents/ai-project/a-share-stock-assistant"
+    },
+    {
+      "id": "121a94d68eb9",
+      "name": "A\u80a1\u5c60\u9f99D3\u56db\u80a1\u6536\u76d8\u590d\u76d8",
+      "prompt": "",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "tulong_review.sh",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "10 15 * * 1-5",
+        "display": "10 15 * * 1-5"
+      },
+      "schedule_display": "10 15 * * 1-5",
+      "repeat": {
+        "times": null,
+        "completed": 4
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-05-25T08:48:14.104903+08:00",
+      "next_run_at": "2026-05-29T15:10:00+08:00",
+      "last_run_at": "2026-05-28T15:10:07.494676+08:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "weixin",
+        "chat_id": "o9cq80wN6U9Yq2exTAaqwvmfV7UQ@im.wechat",
+        "chat_name": null,
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "/Users/fenomenoronaldo/Documents/ai-project/a-share-stock-assistant"
+    },
+    {
+      "id": "b1415c47305e",
+      "name": "A\u80a1\u5c60\u9f99D3\u5f00\u76d8\u524d\u5207\u6c60",
+      "prompt": "",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "preopen_rotate_watchlist.sh",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "50 8 * * 1-5",
+        "display": "50 8 * * 1-5"
+      },
+      "schedule_display": "50 8 * * 1-5",
+      "repeat": {
+        "times": null,
+        "completed": 1
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-05-27T15:10:18.014217+08:00",
+      "next_run_at": "2026-05-29T08:50:00+08:00",
+      "last_run_at": "2026-05-28T08:50:39.744281+08:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "weixin",
+        "chat_id": "o9cq80wN6U9Yq2exTAaqwvmfV7UQ@im.wechat",
+        "chat_name": null,
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "/Users/fenomenoronaldo/Documents/ai-project/a-share-stock-assistant"
+    },
+    {
+      "id": "3dfeb3d23604",
+      "name": "A\u80a1\u5c60\u9f99D3\u5f00\u76d8\u524d\u5b88\u95e8\u6821\u9a8c",
+      "prompt": "",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "preopen_guard_check.sh",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "5 9 * * 1-5",
+        "display": "5 9 * * 1-5"
+      },
+      "schedule_display": "5 9 * * 1-5",
+      "repeat": {
+        "times": null,
+        "completed": 1
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-05-27T15:10:19.095412+08:00",
+      "next_run_at": "2026-05-29T09:05:00+08:00",
+      "last_run_at": "2026-05-28T09:05:42.592836+08:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "weixin",
+        "chat_id": "o9cq80wN6U9Yq2exTAaqwvmfV7UQ@im.wechat",
+        "chat_name": null,
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "/Users/fenomenoronaldo/Documents/ai-project/a-share-stock-assistant"
+    }
+  ],
+  "updated_at": "2026-05-28T15:10:07.497077+08:00"
+}

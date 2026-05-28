@@ -135,7 +135,8 @@ MVP 优先顺序：
 - `references/tulong-d3-d4-monitoring.md`：**当前主规则**。维护屠龙 D3/D4 的日期+D几、D3候选区、D4强势雷达、提醒指标、频率、事件优先、监控池替换验证。后续确认的新 D3/D4 规则优先更新这里。
 - `references/tulong-a-share-mvp.md`：**历史底稿 / 原始战法规则化**。保留早期 D1–D5 状态机、口头规则、正反案例、回测背景；若与当前主规则冲突，以 `tulong-d3-d4-monitoring.md` 为准。
 - `references/a-share-intraday-watchdog.md`：**工程运行方案**。维护少量自选股盘中监控的 watchdog、cron/no_agent、行情接口、日志、JSONL/CSV、去重、静默输出等实现方式。
-- `references/a-share-wechat-alert-format.md`：**微信展示/投递方案**。维护 WeChat code block、换行、消息长度、iLink 限流、事件/快照排版等投递经验。
+- `references/tulong-script-organization.md`：**脚本目录/cron迁移方案**。维护 `scripts/tulong/runtime|selection|legacy` 分层、Hermes cron wrapper 迁移、README、验证和“完成/未验证”汇报边界。
+- `references/tulong-parameterized-selection.md`：**参数化候选池生成器方案**。维护把写死日期的一次性 D3 选股脚本改为 `generate_d3_candidates.py --d1-date --d2-date --d3-date/--d3-label` 的 CLI、输出命名、测试和验证步骤。
 
 ### 屠龙 D3/D4 监控专题
 

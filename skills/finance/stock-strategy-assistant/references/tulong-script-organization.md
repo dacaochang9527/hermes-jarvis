@@ -52,7 +52,7 @@ exec .venv/bin/python scripts/tulong/runtime/watchdog.py "$@"
    - Re-list cron jobs and confirm script names still point to wrappers.
    - Read wrappers and confirm they point to new project paths.
    - Run `python -m py_compile` on moved Python files.
-   - Search for old script-name references in the moved tree and wrappers.
+   - For selection generators, keep strategy predicates in `src/stock_assistant/strategy_tulong.py`; scripts under `scripts/tulong/selection/` should be thin orchestration layers. If the user asks to “下沉到 src”, do that refactor immediately, with tests, then update README and skill references.
    - If safe, dry-run wrapper scripts; if not safe because they may mutate active watchlists or emit Weixin messages, explicitly report “not dry-run yet”.
    - Check `git status`/diff if the project is a git repo.
 
@@ -66,6 +66,35 @@ Not yet verified: dry-run / runtime behavior / git diff review.
 ```
 
 This distinction matters because cron can remain active while wrapper paths are broken, and Weixin delivery failures can hide the final status message.
+
+## Documentation sync rule
+
+When changing any of the following, update both the project README and the relevant skill reference before reporting completion:
+
+- `scripts/tulong/` directory layout or runtime/selection/legacy responsibilities
+- Hermes cron wrapper paths under `~/.hermes/scripts/*.sh`
+- Selection CLI parameters, output filenames, or generator responsibilities
+- D3/D4 monitoring flow, active watchlist source, or preopen rotation/guard behavior
+
+Default project README path:
+
+```text
+/Users/fenomenoronaldo/Documents/ai-project/a-share-stock-assistant/scripts/tulong/README.md
+```
+
+Default skill references:
+
+```text
+stock-strategy-assistant/references/tulong-script-organization.md
+stock-strategy-assistant/references/tulong-parameterized-selection.md
+stock-strategy-assistant/references/tulong-d3-d4-monitoring.md
+```
+
+Keep the split clear: project README documents “how this repo currently runs”; skill references document “how this type of system should be designed next time”.
+
+## Related references
+
+- `references/tulong-parameterized-selection.md`: how to convert dated one-off D3 selection scripts into a reusable `generate_d3_candidates.py` CLI with `--d1-date/--d2-date/--d3-date/--d3-label` and timestamped outputs.
 
 ## Pitfalls from prior session
 
