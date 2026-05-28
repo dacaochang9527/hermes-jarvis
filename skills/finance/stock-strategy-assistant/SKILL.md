@@ -132,7 +132,7 @@ MVP 优先顺序：
 
 本 skill 的 reference 只在这里维护分工说明，避免各文件重复解释关系：
 
-- `references/tulong-d3-d4-monitoring.md`：**当前主规则**。维护屠龙 D3/D4 的日期+D几、D3候选区、D4强势雷达、提醒指标、频率、事件优先、监控池替换验证。后续确认的新 D3/D4 规则优先更新这里。
+- `references/tulong-d3-d4-monitoring.md`：**当前主规则**。维护屠龙 D3/D4 的日期+D几、D3候选区、D4持有区、提醒指标、频率、事件优先、监控池替换验证。后续确认的新 D3/D4 规则优先更新这里。
 - `references/tulong-a-share-mvp.md`：**历史底稿 / 原始战法规则化**。保留早期 D1–D5 状态机、口头规则、正反案例、回测背景；若与当前主规则冲突，以 `tulong-d3-d4-monitoring.md` 为准。
 - `references/a-share-intraday-watchdog.md`：**工程运行方案**。维护少量自选股盘中监控的 watchdog、cron/no_agent、行情接口、日志、JSONL/CSV、去重、静默输出等实现方式。
 - `references/tulong-script-organization.md`：**脚本目录/cron迁移方案**。维护 `scripts/tulong/runtime|selection|legacy` 分层、Hermes cron wrapper 迁移、README、验证和“完成/未验证”汇报边界。
@@ -140,9 +140,9 @@ MVP 优先顺序：
 
 ### 屠龙 D3/D4 监控专题
 
-当用户讨论“屠龙战术”、D3候选区、D4强势雷达、日期+D几（如 0527D3/0527D4）、盘中提醒、买点/止损/参与区、监控池替换时，必须加载：`references/tulong-d3-d4-monitoring.md`。
+当用户讨论“屠龙战术”、D3候选区、D4持有区、日期+D几（如 0527D3/0527D4）、盘中提醒、买点/止损/参与区、监控池替换时，必须加载：`references/tulong-d3-d4-monitoring.md`。
 
-摘要：D3 候选区 = 低吸可执行性 AND 强势潜质；D3 看买点区、回收观察价、止损；D4 强势雷达看参与区、失败线、确认条件；事件检测 5 分钟，快照 15 分钟，事件优先，快照被事件挤掉后约 3 分钟补发。
+摘要：D3 候选区 = 低吸可执行性 AND 强势潜质；D3 看买点区、回收观察价、止损；D4 只保留已买入后的持有区，看止损/止盈/减仓、是否继续持有、是否可加仓、尾盘是否留仓；事件检测 5 分钟，快照 15 分钟，事件优先，快照被事件挤掉后约 3 分钟补发。
 
 ### 大盘/情绪过滤
 
