@@ -10,7 +10,7 @@ Project root example:
 scripts/tulong/
   README.md
   runtime/      # 生产 cron 正在调用的脚本
-  selection/    # 夜间/人工选股、候选池生成脚本
+  selection/    # 选股、自动窄化、候选池生成脚本
   legacy/       # 历史一次性脚本，仅保留参考
 ```
 
