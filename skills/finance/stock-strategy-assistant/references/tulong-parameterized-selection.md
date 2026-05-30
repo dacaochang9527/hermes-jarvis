@@ -120,7 +120,7 @@ The selection generator should import these helpers instead of keeping its own `
 
 ## Cleanup rule
 
-After `generate_d3_candidates.py` is verified for the same date/label as a dated one-off script, delete the superseded one-off scripts rather than keeping multiple sources of truth in `selection/`. Update the project README at the same time.
+After `generate_d3_candidates.py` is verified for the same date/label as a dated one-off script, delete the superseded one-off scripts rather than keeping multiple sources of truth in `selection/`. Update the runtime README (`scripts/tulong/README.md`) at the same time.
 
 For the 0529D3 migration, these one-off scripts were removed after replacement by the parameterized generator:
 

@@ -13,9 +13,8 @@ metadata:
 
 # Stock Strategy Assistant 股票策略助手
 
-> 屠龙运行时已内置于本 skill（2026-05-31 从旧项目 `a-share-stock-assistant` 迁入）。
-> 代码与数据就在本 skill 目录内：`scripts/tulong/`（runtime/selection/legacy）、`src/stock_assistant/`（依赖子集）、`data/`、`reports/`、`tests/`、`pyproject.toml`、`.venv/`。
-> Hermes cron（`~/.hermes/scripts/*.sh` + `~/.hermes/cron/jobs.json` workdir）已指向本 skill 根。运行命令：`cd 本skill根 && .venv/bin/python scripts/tulong/runtime/<脚本>.py`；测试：`.venv/bin/python -m pytest -q`。以后只在本 skill 内维护，无需回到旧项目。
+> 屠龙运行时就在本 skill 目录内：`scripts/tulong/`（runtime/selection/legacy）、`src/stock_assistant/`（依赖子集）、`data/`、`reports/`、`tests/`、`pyproject.toml`、`.venv/`。
+> Hermes cron（`~/.hermes/scripts/*.sh` + `~/.hermes/cron/jobs.json` workdir）指向本 skill 根。运行命令：`cd 本skill根 && .venv/bin/python scripts/tulong/runtime/<脚本>.py`；测试：`.venv/bin/python -m pytest -q`。
 
 ## 适用场景
 
@@ -112,7 +111,7 @@ MVP 优先顺序：
 当用户问“D3/D4 是否在监控池”“列一下当前监控池”时，不要只读日报候选文件或凭记忆回答。必须先核对：
 
 1. `cronjob(action='list')`：确认当前启用的监控任务、脚本名、workdir、最近运行状态、投递错误；
-2. 读取监控脚本里的实际 watchlist 来源，例如 `scripts/tulong_watchdog.py` 中的 `WATCHLIST_CSV_PATH` / `load_watchlist()`；
+2. 读取监控脚本里的实际 watchlist 来源，例如 `scripts/tulong/runtime/watchdog.py` 中的 `WATCHLIST_CSV_PATH` / `load_watchlist()`；
 3. 读取实际生效的 CSV（例如 `data/watchlists/tulong_d3.csv`），把它与 `0527D3_*`、`0527D4_*` 等候选文件分开列；
 4. 对每只股票按代码前缀标注板块/涨跌幅规则，显式指出 `300/301/688/689` 是否混入；
 5. 若候选文件未被监控任务读取，要明确说“候选存在，但当前不在实际监控池”，并给出需要替换/合并监控池的下一步。
@@ -130,7 +129,7 @@ MVP 优先顺序：
 5. **重置或隔离状态文件**：切池后清空旧 `sent`、`last_prices`、`pending_snapshot`，并记录 `watchlist_source`，避免旧票去重和旧价格穿透到新池。
 6. **验证不只看文件内容**：替换后运行一次脚本级验证，检查 `load_watchlist()` 输出、`entry_zone()` 输出、快照标题、事件 JSONL/快照 CSV 的最新行是否都是新池。
 
-常见漏改：只替换监控 CSV，但 `tulong_review.py` 仍 import 静态 `WATCHLIST`；只写观察价/失效位，但丢失 `zone_low/zone_high`；只看候选文件，以为已经入池，却没有确认 cron 实际读取的 CSV。
+常见漏改：只替换监控 CSV，但 `scripts/tulong/runtime/review.py` 仍 import 静态 `WATCHLIST`；只写观察价/失效位，但丢失 `zone_low/zone_high`；只看候选文件，以为已经入池，却没有确认 cron 实际读取的 CSV。
 
 ### Reference 文件分工
 

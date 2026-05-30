@@ -1,5 +1,7 @@
 # 屠龙脚本目录说明
 
+> 位置：本目录现位于 hermes skill 内（`~/.hermes/skills/finance/stock-strategy-assistant/scripts/tulong/`），是屠龙运行时的唯一维护位置；下文所有相对路径（`scripts/`、`src/`、`data/`、`reports/`）均相对该 skill 根。
+
 本目录集中管理 A 股屠龙 D3/D4 相关脚本，避免散落在 `scripts/` 根目录。
 
 ## 总体关系：skill / src / scripts

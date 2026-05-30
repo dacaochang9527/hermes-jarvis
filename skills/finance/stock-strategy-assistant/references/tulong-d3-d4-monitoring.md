@@ -394,7 +394,7 @@ preopen_guard_check         09:05 每交易日执行，成功静默，失败 std
 固定处理步骤：
 
 1. 先读 `data/watchlists/tulong_active_watchlist.csv`，确认每行真实 `stage`、`pool_type`、`source_file`；持仓票如华能蒙电这类应显示为 `0528D4 / position`，而不是沿用买入当天的 D3 标签。
-2. 在 `scripts/tulong_watchdog.py` 或对应脚本中搜索旧标签（如 `0527D3`、`D3主板`、旧四股标题），把单股提醒和快照标题改为从 `item['stage']` 动态读取；缺失时才 fallback 到 `f'{now:%m%d}D3'`。
+2. 在 `scripts/tulong/runtime/watchdog.py` 或对应脚本中搜索旧标签（如 `0527D3`、`D3主板`、旧四股标题），把单股提醒和快照标题改为从 `item['stage']` 动态读取；缺失时才 fallback 到 `f'{now:%m%d}D3'`。
 3. 混合 D3/D4/position 池的快照标题应汇总实际 stages，例如 `0528D3/0528D4主板11股盘中快照`；单股行则用该股票自身 stage。
 4. 修复后必须验证：搜索脚本无旧硬编码残留，并用 `FORCE_RUN=1` 或脚本级函数生成一次告警/快照，确认用户可见文本与 active CSV 一致。
 5. 回答用户时明确区分“数据源/监控池正确”与“展示模板残留错误”，不要把展示问题误报成切池失败。

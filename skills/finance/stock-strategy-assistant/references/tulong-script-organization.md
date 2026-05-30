@@ -1,9 +1,8 @@
 # 屠龙脚本整理与 cron 安全迁移流程
 
-> 迁移说明（2026-05-31）：屠龙运行时已从旧项目 `a-share-stock-assistant` 整体迁入本 skill 内，**当前唯一维护位置**：
-> `~/.hermes/skills/finance/stock-strategy-assistant/`
+> 运行时位置：屠龙运行时位于本 skill，**唯一维护位置** `~/.hermes/skills/finance/stock-strategy-assistant/`。
 > 布局：`scripts/tulong/`（runtime/selection/legacy）、`src/stock_assistant/`（依赖子集）、`data/`、`reports/`、`tests/`、`pyproject.toml`、`.venv/`。
-> Hermes cron 的 `~/.hermes/scripts/*.sh` 与 `~/.hermes/cron/jobs.json` 的 workdir 均已指向本 skill 根。旧项目保留为只读归档。
+> Hermes cron 的 `~/.hermes/scripts/*.sh` 与 `~/.hermes/cron/jobs.json` 的 workdir 均指向本 skill 根。
 
 Use this when整理 A 股屠龙/D3/D4 项目里的脚本、cron 包装器、监控脚本目录，尤其是用户说“脚本太乱、哪些在用、能不能放到独立文件夹”。
 
@@ -25,7 +24,7 @@ Do not leave currently used D3/D4 scripts scattered in `scripts/` root once migr
 
 1. Discover active cron jobs first.
    - Record job name, schedule, `script`, `workdir`, mode, last status.
-   - Treat `~/.hermes/scripts/*.sh` as the cron entrypoint even when real code lives in the project.
+   - Treat `~/.hermes/scripts/*.sh` as the cron entrypoint; the real code now lives inside this skill (`scripts/tulong/`).
 
 2. Discover project scripts.
    - Identify runtime scripts by cron wrapper references.
@@ -55,11 +54,11 @@ exec .venv/bin/python scripts/tulong/runtime/watchdog.py "$@"
 
 6. Verification before saying “complete”.
    - Re-list cron jobs and confirm script names still point to wrappers.
-   - Read wrappers and confirm they point to new project paths.
+   - Read wrappers and confirm they `cd` into the skill root and call `.venv/bin/python scripts/tulong/runtime/...`.
    - Run `python -m py_compile` on moved Python files.
    - For selection generators, keep strategy predicates in `src/stock_assistant/strategy_tulong.py`; scripts under `scripts/tulong/selection/` should be thin orchestration layers. If the user asks to “下沉到 src”, do that refactor immediately, with tests, then update README and skill references.
    - If safe, dry-run wrapper scripts; if not safe because they may mutate active watchlists or emit Weixin messages, explicitly report “not dry-run yet”.
-   - Check `git status`/diff if the project is a git repo.
+   - Check `git status`/diff in the tracking repo (`~/.hermes`).
 
 ## Reporting rule
 
@@ -74,7 +73,7 @@ This distinction matters because cron can remain active while wrapper paths are 
 
 ## Documentation sync rule
 
-When changing any of the following, update both the project README and the relevant skill reference before reporting completion:
+修改以下任一项时，须同步更新运行时 README（`scripts/tulong/README.md`）与相关 skill reference 后再汇报完成：
 
 - `scripts/tulong/` directory layout or runtime/selection/legacy responsibilities
 - Hermes cron wrapper paths under `~/.hermes/scripts/*.sh`
@@ -95,7 +94,7 @@ stock-strategy-assistant/references/tulong-parameterized-selection.md
 stock-strategy-assistant/references/tulong-d3-d4-monitoring.md
 ```
 
-Keep the split clear: project README documents “how this repo currently runs”; skill references document “how this type of system should be designed next time”.
+分工保持清晰：运行时 README（`scripts/tulong/README.md`）记录“本 skill 当前如何运行”；skill references 记录“这类系统下次应如何设计”。
 
 ## Related references
 
