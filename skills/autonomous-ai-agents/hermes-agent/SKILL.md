@@ -21,7 +21,7 @@ What makes Hermes different:
 - **Self-improving through skills** — Hermes learns from experience by saving reusable procedures as skills. When it solves a complex problem, discovers a workflow, or gets corrected, it can persist that knowledge as a skill document that loads into future sessions. Skills accumulate over time, making the agent better at your specific tasks and environment.
 - **Persistent memory across sessions** — remembers who you are, your preferences, environment details, and lessons learned. Pluggable memory backends (built-in, Honcho, Mem0, and more) let you choose how memory works.
 - **Multi-platform gateway** — the same agent runs on Telegram, Discord, Slack, WhatsApp, Signal, Matrix, Email, and 10+ other platforms with full tool access, not just chat.
-- **Provider-agnostic** — swap models and providers mid-workflow without changing anything else. Credential pools rotate across multiple API keys automatically.
+- **Provider routing and model selection** — use explicit provider/model names when users ask for a specific vendor or tier. For DeepSeek direct API, `deepseek-v4-pro` and `deepseek-v4-flash` are first-class names; `deepseek-chat` is the legacy V3 alias. See `references/deepseek-direct-api.md` for the verified config shape and checks.
 - **Profiles** — run multiple independent Hermes instances with isolated configs, sessions, skills, and memory.
 - **Extensible** — plugins, MCP servers, custom tools, webhook triggers, cron scheduling, and the full Python ecosystem.
 
@@ -399,6 +399,26 @@ Full config reference: https://hermes-agent.nousresearch.com/docs/user-guide/con
 | GitHub Copilot | Token | `COPILOT_GITHUB_TOKEN` |
 | Google Gemini | API key | `GOOGLE_API_KEY` or `GEMINI_API_KEY` |
 | DeepSeek | API key | `DEEPSEEK_API_KEY` |
+
+DeepSeek direct provider notes:
+- Official OpenAI-compatible base URL is `https://api.deepseek.com` in the docs; Hermes' built-in `deepseek` provider uses `https://api.deepseek.com/v1` internally for OpenAI Chat Completions.
+- Use first-class official model IDs when selecting newer DeepSeek models: `deepseek-v4-pro` or `deepseek-v4-flash`.
+- Do not use `deepseek-chat` when the user explicitly asks for V4 Pro/Flash. As of the DeepSeek Chinese docs checked 2026-05-30, `deepseek-chat` and `deepseek-reasoner` are compatibility names scheduled for deprecation on 2026-07-24, and `deepseek-chat` maps to V4 Flash non-thinking/thinking compatibility behavior rather than V4 Pro.
+- To make DeepSeek V4 Pro the main model:
+  ```bash
+  hermes config set model.provider deepseek
+  hermes config set model.default deepseek-v4-pro
+  ```
+- To keep DeepSeek as a fallback provider while using V4 Pro:
+  ```bash
+  hermes config set fallback_providers '[{"provider":"deepseek","model":"deepseek-v4-pro"}]'
+  ```
+- If editing YAML directly, the fallback shape is a top-level list:
+  ```yaml
+  fallback_providers:
+  - provider: deepseek
+    model: deepseek-v4-pro
+  ```
 | xAI / Grok | API key | `XAI_API_KEY` |
 | Hugging Face | Token | `HF_TOKEN` |
 | Z.AI / GLM | API key | `GLM_API_KEY` |
@@ -415,7 +435,10 @@ Full config reference: https://hermes-agent.nousresearch.com/docs/user-guide/con
 | Custom endpoint | Config | `model.base_url` + `model.api_key` in config.yaml |
 | GitHub Copilot ACP | External | `COPILOT_CLI_PATH` or Copilot CLI |
 
-Full provider docs: https://hermes-agent.nousresearch.com/docs/integrations/providers
+
+DeepSeek direct-API note: when the user wants `deepseek-v4-pro` or `deepseek-v4-flash` on the official API, use provider `deepseek`, base URL `https://api.deepseek.com/v1`, and set `model.default` to the exact model name. For fallback chains, use top-level `fallback_providers` instead of overwriting the primary model.
+
+Reference: `references/deepseek-direct-api.md`
 
 ### Toolsets
 
