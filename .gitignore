@@ -49,6 +49,9 @@ config.yaml.bak*
 
 # --- Cache & Skills Hub local state ---
 models_dev_cache.json
+ollama_cloud_models_cache.json
+cache/
+.skills_prompt_snapshot.json
 skills/.hub/
 skills/.bundled_manifest
 skills/.curator_state
