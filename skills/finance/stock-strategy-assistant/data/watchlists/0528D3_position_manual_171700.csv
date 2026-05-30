@@ -1,0 +1,5 @@
+code,name,industry,stage,pool_type,source_file,trigger_price,invalid_price,zone_low,zone_high,rank,score,note,entry_date,entry_stage,entry_price,quantity,sellable_quantity,cost_amount,position_status
+002181,粤传媒,广告营销,0528D3,position,0528D3_position_manual_171700.csv,,,,,,,0528D3买入｜手工建仓｜成本15.093｜数量700｜分3笔300@15.190+200@15.040+200@15.000,2026-05-28,0528D3,15.093,700,0,10565.00,open
+003004,声迅股份,安防设备,0528D3,position,0528D3_position_manual_171700.csv,,,,,,,0528D3买入｜手工建仓｜成本55.150｜数量100,2026-05-28,0528D3,55.150,100,0,5515.00,open
+603685,晨丰科技,照明设备,0528D3,position,0528D3_position_manual_171700.csv,,,,,,,0528D3买入｜手工建仓｜成本36.120｜数量100,2026-05-28,0528D3,36.120,100,0,3612.00,open
+600719,大连热电,电力,0528D3,position,0528D3_position_manual_171700.csv,,,,,,,0528D3买入｜手工建仓｜成本10.150｜数量300,2026-05-28,0528D3,10.150,300,0,3045.00,open

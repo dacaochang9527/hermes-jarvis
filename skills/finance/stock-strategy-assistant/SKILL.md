@@ -13,6 +13,10 @@ metadata:
 
 # Stock Strategy Assistant 股票策略助手
 
+> 屠龙运行时已内置于本 skill（2026-05-31 从旧项目 `a-share-stock-assistant` 迁入）。
+> 代码与数据就在本 skill 目录内：`scripts/tulong/`（runtime/selection/legacy）、`src/stock_assistant/`（依赖子集）、`data/`、`reports/`、`tests/`、`pyproject.toml`、`.venv/`。
+> Hermes cron（`~/.hermes/scripts/*.sh` + `~/.hermes/cron/jobs.json` workdir）已指向本 skill 根。运行命令：`cd 本skill根 && .venv/bin/python scripts/tulong/runtime/<脚本>.py`；测试：`.venv/bin/python -m pytest -q`。以后只在本 skill 内维护，无需回到旧项目。
+
 ## 适用场景
 
 当用户希望讨论、设计或实现以下系统时加载本 skill：

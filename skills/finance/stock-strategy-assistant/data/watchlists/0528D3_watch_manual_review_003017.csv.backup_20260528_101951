@@ -1,0 +1,6 @@
+code,name,industry,stage,pool_type,source_file,trigger_price,invalid_price,zone_low,zone_high,rank,score,note,entry_date,entry_stage,entry_price,quantity,sellable_quantity,cost_amount,position_status
+002181,粤传媒,出版,0528D3,watch,0528D3_watch_manual_review_003017.csv,15.00,13.17,14.78,15.04,1,94,0528D3｜watch｜manual_review｜D1=0526首板 D2=0527确认｜D2近十字/分歧平衡｜回落5.5%｜量比1.19｜安全垫13.9%｜成交额23.8亿｜D1炸板1次但封板资金约1.1亿，分歧后承接可接受,,,,,,,
+000506,招金黄金,贵金属,0528D3,watch,0528D3_watch_manual_review_003017.csv,14.88,14.00,14.66,14.92,2,87,0528D3｜watch｜manual_review｜D1=0526首板 D2=0527确认｜D1未炸板且封板资金约1.2亿｜D2回落5.8%且未破位｜量比1.35｜安全垫6.3%｜适合看水下承接/回收，弱则快放弃,,,,,,,
+003004,声迅股份,计算机设备,0528D3,watch,0528D3_watch_manual_review_003017.csv,54.91,49.76,54.09,55.07,3,88,0528D3｜watch｜manual_review｜D1=0526首板 D2=0527确认｜D2分歧充分/近十字｜回落8.8%｜量比1.21｜安全垫10.3%｜成交额3.9亿｜缺点：D1尾盘封板、D2上影偏长，优先级低于前两只,,,,,,,
+001331,胜通能源,燃气Ⅱ,0528D3,watch,0528D3_watch_manual_review_003017.csv,69.78,61.67,68.73,69.99,4,80,0528D3｜watch｜manual_review｜D1=0526首板 D2=0527确认｜D2近十字｜量比1.25｜安全垫13.2%｜成交额10.3亿｜缺点：D2上影偏长、股价高波动大，低频观察优先,,,,,,,
+603685,晨丰科技,光学光电,0528D3,watch,0528D3_watch_manual_review_003017.csv,35.76,32.56,35.22,35.87,5,75,0528D3｜watch｜manual_review｜D1=0526首板 D2=0527确认｜按用户分时图校正：不按接口炸板4次重罚｜D2近十字/分歧平衡｜量比0.99｜回落3.1%｜安全垫9.8%｜成交额3.5亿｜边缘第5只,,,,,,,

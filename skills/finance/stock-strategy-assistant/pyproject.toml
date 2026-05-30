@@ -1,0 +1,20 @@
+[project]
+name = "stock-strategy-assistant-tulong"
+version = "0.1.0"
+description = "屠龙战法运行时（迁入 hermes skill 内的选股/监控/复盘脚本与依赖）"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas>=2.0",
+  "pyyaml>=6.0",
+  "requests>=2.31",
+  "akshare>=1.14.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,5 +1,10 @@
 # 屠龙脚本整理与 cron 安全迁移流程
 
+> 迁移说明（2026-05-31）：屠龙运行时已从旧项目 `a-share-stock-assistant` 整体迁入本 skill 内，**当前唯一维护位置**：
+> `~/.hermes/skills/finance/stock-strategy-assistant/`
+> 布局：`scripts/tulong/`（runtime/selection/legacy）、`src/stock_assistant/`（依赖子集）、`data/`、`reports/`、`tests/`、`pyproject.toml`、`.venv/`。
+> Hermes cron 的 `~/.hermes/scripts/*.sh` 与 `~/.hermes/cron/jobs.json` 的 workdir 均已指向本 skill 根。旧项目保留为只读归档。
+
 Use this when整理 A 股屠龙/D3/D4 项目里的脚本、cron 包装器、监控脚本目录，尤其是用户说“脚本太乱、哪些在用、能不能放到独立文件夹”。
 
 ## Recommended target layout
@@ -36,7 +41,7 @@ Do not leave currently used D3/D4 scripts scattered in `scripts/` root once migr
    - Example wrapper body after migration:
 
 ```bash
-cd /Users/fenomenoronaldo/Documents/ai-project/a-share-stock-assistant
+cd /Users/fenomenoronaldo/.hermes/skills/finance/stock-strategy-assistant
 exec .venv/bin/python scripts/tulong/runtime/watchdog.py "$@"
 ```
 
@@ -76,10 +81,10 @@ When changing any of the following, update both the project README and the relev
 - Selection CLI parameters, output filenames, or generator responsibilities
 - D3/D4 monitoring flow, active watchlist source, or preopen rotation/guard behavior
 
-Default project README path:
+Default runtime README path（现位于 skill 内）：
 
 ```text
-/Users/fenomenoronaldo/Documents/ai-project/a-share-stock-assistant/scripts/tulong/README.md
+~/.hermes/skills/finance/stock-strategy-assistant/scripts/tulong/README.md
 ```
 
 Default skill references:
