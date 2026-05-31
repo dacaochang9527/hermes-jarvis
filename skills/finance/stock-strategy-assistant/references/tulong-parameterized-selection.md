@@ -101,7 +101,7 @@ src/stock_assistant/strategy_tulong.py
 
 Recommended split:
 
-- `tulong-d3-d4-monitoring.md`: human/agent rule口径（D1过滤规则、D1质量评分、D2确认、D3分层）。
+- `tulong-selection-and-monitoring.md`: human/agent rule口径（D1过滤规则、D1质量评分、D2确认、D3分层）。
 - `src/stock_assistant/strategy_tulong.py`: reusable rule functions and structured results.
 - `scripts/tulong/selection/generate_d3_candidates.py`: CLI parsing, data loading, calling rule functions, writing CSV/Markdown.
 

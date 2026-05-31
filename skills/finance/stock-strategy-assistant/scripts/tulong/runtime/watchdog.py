@@ -125,16 +125,17 @@ def is_trading_window(now: datetime) -> bool:
 
 def validate_watchlist_date(now: datetime, watchlist: list[dict[str, Any]]) -> bool:
     expected_prefix = f'{now:%m%d}'
+    # 仅校验 watch 行的当日日期前缀；position(HOLD) 行无日期、按 entry_date 续期，豁免
     stale = [
         f'{item.get("code", "")}:{item.get("stage", "")}'
         for item in watchlist
-        if not str(item.get('stage', '')).startswith(expected_prefix)
+        if item.get('pool_type') == 'watch' and not str(item.get('stage', '')).startswith(expected_prefix)
     ]
     if stale:
         append_log(f'[{now:%Y-%m-%d %H:%M:%S}] stale_active_watchlist expected_prefix={expected_prefix} stale={stale}')
         print(
             '【A股监控】实际监控池日期异常，已暂停本轮提醒\n'
-            f'期望：{expected_prefix}D3/{expected_prefix}D4\n'
+            f'期望：{expected_prefix}D3(watch) / HOLD(position)\n'
             f'异常：{", ".join(stale)}'
         )
         return False

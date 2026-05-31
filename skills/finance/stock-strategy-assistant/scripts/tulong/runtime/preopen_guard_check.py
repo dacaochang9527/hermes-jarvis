@@ -96,12 +96,14 @@ def validate(now: datetime) -> tuple[list[str], dict[str, Any]]:
             missing.extend(key for key in REQUIRED_POSITION if not row.get(key))
         if missing:
             missing_required.append(f'{code}:{"/".join(missing)}')
-        if not stage.startswith(expected_prefix):
-            errors.append(f'{code} stage日期异常：当前={stage}，期望前缀={expected_prefix}')
+        if pool_type == 'watch' and not stage.startswith(expected_prefix):
+            errors.append(f'{code} watch stage日期异常：当前={stage}，期望前缀={expected_prefix}')
         if pool_type not in VALID_POOL_TYPES:
             errors.append(f'{code} pool_type异常：当前={pool_type}，期望=watch/position')
-        if stage.endswith('D4') and pool_type != 'position':
-            errors.append(f'{code} D4只允许持有区position，当前pool_type={pool_type}')
+        if pool_type == 'position' and stage != 'HOLD':
+            errors.append(f'{code} 持仓行stage应为HOLD，当前={stage}')
+        if stage == 'HOLD' and pool_type != 'position':
+            errors.append(f'{code} HOLD只允许持仓position，当前pool_type={pool_type}')
 
     if bad_prefix:
         errors.append('实际监控池混入非沪深主板/20cm标的：' + '、'.join(bad_prefix))
@@ -135,7 +137,7 @@ def validate(now: datetime) -> tuple[list[str], dict[str, Any]]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description='Guard-check active Tulong D3 watchlist and D4 positions after preopen rotation.')
+    parser = argparse.ArgumentParser(description='Guard-check active Tulong D3 watchlist and HOLD positions after preopen rotation.')
     parser.add_argument('--date', help='Override watch date, format YYYY-MM-DD. Useful for dry-run verification.')
     return parser.parse_args()
 
@@ -154,7 +156,7 @@ def main() -> int:
         lines = [
             '【A股监控】09:05守门校验失败：监控池未确认，需暂停旧池风险',
             f'检查时间：{now:%Y-%m-%d %H:%M:%S}',
-            f'期望日期前缀：{detail["expected_prefix"]}D3 / {detail["expected_prefix"]}D4',
+            f'期望：{detail["expected_prefix"]}D3(watch) / HOLD(position)',
             '',
             '问题：',
         ]

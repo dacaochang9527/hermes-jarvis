@@ -2,7 +2,7 @@
 
 > 位置：本目录现位于 hermes skill 内（`~/.hermes/skills/finance/stock-strategy-assistant/scripts/tulong/`），是屠龙运行时的唯一维护位置；下文所有相对路径（`scripts/`、`src/`、`data/`、`reports/`）均相对该 skill 根。
 
-本目录集中管理 A 股屠龙 D3/D4 相关脚本，避免散落在 `scripts/` 根目录。
+本目录集中管理 A 股屠龙 D3 选股与持仓监控相关脚本，避免散落在 `scripts/` 根目录。
 
 ## 总体关系：skill / src / scripts
 
@@ -12,11 +12,11 @@ src/stock_assistant    = 可复用规则执行器
 scripts/tulong         = 流程编排器 / 实际运行脚本
 ```
 
-- skill 负责长期口径：D1/D2/D3/D4 定义、D3观察区分层、提醒降噪、文件命名、切池和验证纪律。
+- skill 负责长期口径：D1/D2/D3 定义、D3观察区分层、HOLD 持仓事实、提醒降噪、文件命名、切池和验证纪律。
 - `src/stock_assistant/strategy_tulong.py` 负责把规则沉淀成可复用函数，后续应逐步减少 selection/runtime 脚本里的重复硬编码。
 - `scripts/tulong/` 负责读数据、调规则、写 CSV/Markdown、被 cron 调度和运行。
 
-文档同步约定：以后如果修改 `scripts/tulong` 目录结构、runtime/selection/legacy 分工、cron wrapper、候选池生成器参数或 D3/D4 流程，必须同步更新本 README，并视情况同步 `stock-strategy-assistant` skill 的相关 reference。
+文档同步约定：以后如果修改 `scripts/tulong` 目录结构、runtime/selection/legacy 分工、cron wrapper、候选池生成器参数或 D3 选股/HOLD 持仓流程，必须同步更新本 README，并视情况同步 `stock-strategy-assistant` skill 的相关 reference。
 
 ## runtime/：生产调度正在使用
 
@@ -33,8 +33,8 @@ scripts/tulong         = 流程编排器 / 实际运行脚本
 
 - `runtime/preopen_rotate_watchlist.py`
   - 开盘前切池脚本。
-  - 08:50 cron 调用，合并今日 D3 watch/position 与 D4 position 源文件到 active 池。
-  - D4 不再接收 watch 源文件；若混入 D4/watch 行会被拒绝。
+  - 08:50 cron 调用，合并今日 `MMDDD3_watch_*` 观察源与最新 `HOLD_position_*` 持仓源到 active 池。
+  - HOLD 只接收 position 源文件；若混入 HOLD/watch 行会被拒绝。
 
 - `runtime/preopen_guard_check.py`
   - 开盘前守门校验脚本。

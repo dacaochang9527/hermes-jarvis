@@ -13,9 +13,9 @@ metadata:
 
 # Personal Quant Trading Tools 个人量化/选股助手
 
-## 屠龙 D3/D4 规则迁移说明
+## 屠龙 D3 选股与持仓规则迁移说明
 
-屠龙 D3/D4 监控规则的主版本已迁移到 `stock-strategy-assistant`：`references/tulong-d3-d4-monitoring.md`。后续新增或修正 D3 候选区、D4 强势雷达、盘中提醒频率、提醒格式和监控池替换规则时，以 `stock-strategy-assistant` 为唯一主版本；本文件仅保留历史参考，不再作为维护入口。
+屠龙 D3 选股与 HOLD 持仓监控规则的主版本已迁移到 `stock-strategy-assistant`：`references/tulong-selection-and-monitoring.md`。后续新增或修正 D3 候选区、HOLD 持仓、盘中提醒频率、提醒格式和监控池替换规则时，以 `stock-strategy-assistant` 为唯一主版本；本文件仅保留历史参考，不再作为维护入口。
 
 ## 场景
 

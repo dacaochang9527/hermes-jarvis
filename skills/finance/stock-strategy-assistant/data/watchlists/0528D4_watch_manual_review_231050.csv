@@ -1,5 +1,0 @@
-code,name,industry,stage,pool_type,source_file,trigger_price,invalid_price,zone_low,zone_high,rank,score,note,entry_date,entry_stage,entry_price,quantity,sellable_quantity,cost_amount,position_status
-600396,华电辽能,电力,0528D4,watch,0528D4_watch_manual_review_231050.csv,16.88,14.75,16.63,16.93,1,90,0528D4｜watch｜manual_review｜来自0527D3走强｜0527收盘涨停18.57(+10.01%)｜观察价16.88｜失效14.75｜电力方向核心观察,,,,,,,
-605006,山东玻纤,玻璃玻纤,0528D4,watch,0528D4_watch_manual_review_231050.csv,18.55,17.20,17.70,18.55,2,86,0528D4｜watch｜manual_review｜来自0527D4强势股｜0527盘中最高+9.99%、收盘+3.52%｜看回踩承接/再冲板,,,,,,,
-600719,大连热电,电力,0528D4,watch,0528D4_watch_manual_review_231050.csv,10.15,9.83,9.95,10.15,3,82,0528D4｜watch｜manual_review｜来自0527D4强势股｜0527收盘+3.26%、盘中最高+5.49%｜电力方向温和延续,,,,,,,
-603919,金徽酒,白酒Ⅱ,0528D4,watch,0528D4_watch_manual_review_231050.csv,20.83,19.25,20.52,20.89,4,80,0528D4｜watch｜manual_review｜来自0527D3走强｜0527收盘21.83(+4.80%)、站上观察价20.83｜低于涨停票优先级,,,,,,,

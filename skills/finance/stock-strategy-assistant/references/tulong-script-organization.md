@@ -91,7 +91,7 @@ Default skill references:
 ```text
 stock-strategy-assistant/references/tulong-script-organization.md
 stock-strategy-assistant/references/tulong-parameterized-selection.md
-stock-strategy-assistant/references/tulong-d3-d4-monitoring.md
+stock-strategy-assistant/references/tulong-selection-and-monitoring.md
 ```
 
 分工保持清晰：运行时 README（`scripts/tulong/README.md`）记录“本 skill 当前如何运行”；skill references 记录“这类系统下次应如何设计”。

@@ -26,7 +26,7 @@ metadata:
 - 回测某个选股策略或验证正反案例；
 - 构建每日收盘报告、盘中提醒、风控/复盘系统。
 
-当后续和用户确认新的股票策略规则、D3/D4 指标、提醒格式、频率、监控池流转或风控口径后，应同步更新本 skill；若是屠龙 D3/D4 细节，优先更新 `references/tulong-d3-d4-monitoring.md`，SKILL.md 只保留摘要和路由。
+当后续和用户确认新的股票策略规则、D3 选股/HOLD 持仓指标、提醒格式、频率、监控池流转或风控口径后，应同步更新本 skill；若是屠龙 D3 选股或 HOLD 持仓细节，优先更新 `references/tulong-selection-and-monitoring.md`，SKILL.md 只保留摘要和路由。
 
 ## 合规与安全边界
 
@@ -108,11 +108,11 @@ MVP 优先顺序：
 
 ### 候选池 vs 实际监控池核对
 
-当用户问“D3/D4 是否在监控池”“列一下当前监控池”时，不要只读日报候选文件或凭记忆回答。必须先核对：
+当用户问“D3 观察 / HOLD 持仓是否在监控池”“列一下当前监控池”时，不要只读日报候选文件或凭记忆回答。必须先核对：
 
 1. `cronjob(action='list')`：确认当前启用的监控任务、脚本名、workdir、最近运行状态、投递错误；
 2. 读取监控脚本里的实际 watchlist 来源，例如 `scripts/tulong/runtime/watchdog.py` 中的 `WATCHLIST_CSV_PATH` / `load_watchlist()`；
-3. 读取实际生效的 CSV（例如 `data/watchlists/tulong_d3.csv`），把它与 `0527D3_*`、`0527D4_*` 等候选文件分开列；
+3. 读取实际生效的 CSV（例如 `data/watchlists/tulong_active_watchlist.csv`），把它与 `MMDDD3_watch_*`、`HOLD_position_*` 等源文件分开列；
 4. 对每只股票按代码前缀标注板块/涨跌幅规则，显式指出 `300/301/688/689` 是否混入；
 5. 若候选文件未被监控任务读取，要明确说“候选存在，但当前不在实际监控池”，并给出需要替换/合并监控池的下一步。
 
@@ -135,17 +135,17 @@ MVP 优先顺序：
 
 本 skill 的 reference 只在这里维护分工说明，避免各文件重复解释关系：
 
-- `references/tulong-d3-d4-monitoring.md`：**当前主规则**。维护屠龙 D3/D4 的日期+D几、D3候选区、D4持有区、提醒指标、频率、事件优先、监控池替换验证。后续确认的新 D3/D4 规则优先更新这里。
-- `references/tulong-a-share-mvp.md`：**历史底稿 / 原始战法规则化**。保留早期 D1–D5 状态机、口头规则、正反案例、回测背景；若与当前主规则冲突，以 `tulong-d3-d4-monitoring.md` 为准。
+- `references/tulong-selection-and-monitoring.md`：**当前主规则**。维护屠龙 D3 选股的日期+D几、D3候选区、HOLD 持仓、提醒指标、频率、事件优先、监控池替换验证。后续确认的新 D3 选股/HOLD 持仓规则优先更新这里。
+- `references/tulong-a-share-mvp.md`：**历史底稿 / 原始战法规则化**。保留早期 D1–D3 状态机、口头规则、正反案例、回测背景；若与当前主规则冲突，以 `tulong-selection-and-monitoring.md` 为准。
 - `references/a-share-intraday-watchdog.md`：**工程运行方案**。维护少量自选股盘中监控的 watchdog、cron/no_agent、行情接口、日志、JSONL/CSV、去重、静默输出等实现方式。
 - `references/tulong-script-organization.md`：**脚本目录/cron迁移方案**。维护 `scripts/tulong/runtime|selection|legacy` 分层、Hermes cron wrapper 迁移、README、验证和“完成/未验证”汇报边界。
 - `references/tulong-parameterized-selection.md`：**参数化候选池生成器方案**。维护把写死日期的一次性 D3 选股脚本改为 `generate_d3_candidates.py --d1-date --d2-date --d3-date/--d3-label` 的 CLI、输出命名、测试和验证步骤。
 
-### 屠龙 D3/D4 监控专题
+### 屠龙 D3 选股与持仓监控专题
 
-当用户讨论“屠龙战术”、D3候选区、D4持有区、日期+D几（如 0527D3/0527D4）、盘中提醒、买点/止损/参与区、监控池替换时，必须加载：`references/tulong-d3-d4-monitoring.md`。
+当用户讨论“屠龙战术”、D3候选区、HOLD 持仓、日期+D几（如 0527D3）、盘中提醒、买点/止损/参与区、监控池替换时，必须加载：`references/tulong-selection-and-monitoring.md`。
 
-摘要：D3 候选区 = 低吸可执行性 AND 强势潜质；D3 看买点区、回收观察价、止损；买入后进入持仓事实层，按 T+1 可卖性管理，验证期不预设 D4/D5 卖出/加仓策略（已移除，待验证后另定）；事件检测 5 分钟，快照 15 分钟，事件优先，快照被事件挤掉后约 3 分钟补发。
+摘要：D3 候选区 = 低吸可执行性 AND 强势潜质；D3 看买点区、回收观察价、止损；买入后即转为 `HOLD` 持仓（无日期前缀，按 `entry_date` 派生可卖性），验证期不预设买入后卖出/加仓策略（已移除，待验证后另定）；事件检测 5 分钟，快照 15 分钟，事件优先，快照被事件挤掉后约 3 分钟补发。
 
 ### 大盘/情绪过滤
 
@@ -167,7 +167,7 @@ MVP 优先顺序：
 
 ## 屠龙战术规则化参考
 
-详细 D3/D4 执行规则见：`references/tulong-d3-d4-monitoring.md`。旧版 MVP 规则参考：`references/tulong-a-share-mvp.md`。
+详细 D3 选股与持仓监控规则见：`references/tulong-selection-and-monitoring.md`。旧版 MVP 规则参考：`references/tulong-a-share-mvp.md`。
 
 使用时重点注意：
 
@@ -175,7 +175,7 @@ MVP 优先顺序：
 - 术语要收敛：规则描述统一使用“D1过滤规则”“D2过滤规则”或“D1/D2过滤规则”，不要混用“硬过滤”“硬条件”“基础风险过滤”等近义词；
 - D2 是核心过滤日：要区分“分歧洗盘”和“高开低走出货”；
 - D3 只做水下观察，跌破 D1 支撑则策略失效；
-- 买入后的退出/加仓策略（原 D4/D5 规则）验证期已移除，不预设，待数据验证后另定；
+- 买入后的退出/加仓策略验证期已移除，不预设，待数据验证后另定；
 - 需要先回测正反样本，再考虑盘中提醒。
 
 ## 项目脚手架建议

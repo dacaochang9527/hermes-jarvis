@@ -36,6 +36,8 @@ def append_log(message: str) -> None:
 
 
 def label_for(now: datetime, stage: str) -> str:
+    if stage == 'HOLD':
+        return 'HOLD'
     return f'{now:%m%d}{stage}'
 
 
@@ -73,7 +75,8 @@ def find_latest_source(now: datetime, stage: str, pool_type: str) -> Path | None
 
 def find_sources(now: datetime) -> list[Path]:
     sources: list[Path] = []
-    for stage, pool_type in (('D3', 'watch'), ('D3', 'position'), ('D4', 'position')):
+    # watch 走当日 MMDDD3；position 走最新 HOLD 快照（无日期前缀，跨日滚动续期）
+    for stage, pool_type in (('D3', 'watch'), ('HOLD', 'position')):
         path = find_latest_source(now, stage, pool_type)
         if path:
             sources.append(path)
@@ -112,8 +115,12 @@ def normalize_source_rows(src: Path) -> tuple[list[dict[str, str]], list[str]]:
             pool_type = row.get('pool_type') or fallback_pool_type
             if pool_type not in VALID_POOL_TYPES:
                 raise RuntimeError(f'invalid pool_type={pool_type} code={code} source={src.name}')
-            if str(stage).endswith('D4') and pool_type != 'position':
-                raise RuntimeError(f'D4 only accepts position rows: code={code} pool_type={pool_type} source={src.name}')
+            if pool_type == 'position' and str(stage) != 'HOLD':
+                raise RuntimeError(f'position rows must use stage=HOLD: code={code} stage={stage} source={src.name}')
+            if str(stage) == 'HOLD' and pool_type != 'position':
+                raise RuntimeError(f'HOLD only accepts position rows: code={code} pool_type={pool_type} source={src.name}')
+            if pool_type == 'watch' and not str(stage).endswith('D3'):
+                raise RuntimeError(f'watch rows must use MMDDD3 stage: code={code} stage={stage} source={src.name}')
             out = {name: row.get(name, '') for name in ACTIVE_FIELDNAMES}
             out.update({
                 'code': code,
@@ -153,7 +160,7 @@ def write_active_watchlist(sources: list[Path], now: datetime) -> tuple[int, lis
         filtered.extend(src_filtered)
         source_names.append(src.name)
     if not rows:
-        raise RuntimeError('no rows after merging timestamped D3/D4 sources')
+        raise RuntimeError('no rows after merging timestamped D3 watch / HOLD position sources')
 
     if ACTIVE_WATCHLIST.exists():
         backup = ACTIVE_WATCHLIST.with_name(f'{ACTIVE_WATCHLIST.stem}.backup_{now:%Y%m%d_%H%M%S}{ACTIVE_WATCHLIST.suffix}')
@@ -185,7 +192,12 @@ def active_state_matches(now: datetime) -> bool:
             rows = list(csv.DictReader(f))
     except Exception:
         return False
-    return bool(rows) and all(str(row.get('stage', '')).startswith(expected_prefix) for row in rows)
+    # 仅要求 watch 行带当日日期前缀；position(HOLD) 行无日期，豁免
+    return bool(rows) and all(
+        str(row.get('stage', '')).startswith(expected_prefix)
+        for row in rows
+        if row.get('pool_type') == 'watch'
+    )
 
 
 def validate_active_watchlist(now: datetime) -> dict[str, object]:
@@ -196,7 +208,7 @@ def validate_active_watchlist(now: datetime) -> dict[str, object]:
     expected_prefix = f'{now:%m%d}'
     watchlist = watchdog.load_watchlist()
     bad_prefix = [item['code'] for item in watchlist if not is_main_board(item['code'])]
-    stale_stage = [item['code'] for item in watchlist if not str(item.get('stage', '')).startswith(expected_prefix)]
+    stale_stage = [item['code'] for item in watchlist if item.get('pool_type') == 'watch' and not str(item.get('stage', '')).startswith(expected_prefix)]
     bad_pool_type = [item['code'] for item in watchlist if item.get('pool_type') not in VALID_POOL_TYPES]
     payload = {
         'validated_at': now.isoformat(timespec='seconds'),
@@ -213,7 +225,7 @@ def validate_active_watchlist(now: datetime) -> dict[str, object]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description='Rotate active Tulong D3 watchlist and D4 positions before market open.')
+    parser = argparse.ArgumentParser(description='Rotate active Tulong D3 watchlist and HOLD positions before market open.')
     parser.add_argument('--date', help='Override watch date, format YYYY-MM-DD. Useful for dry-run verification.')
     parser.add_argument('--force', action='store_true', help='Rotate even if state already matches today.')
     return parser.parse_args()
@@ -232,7 +244,7 @@ def main() -> int:
 
     sources = find_sources(now)
     if not sources:
-        msg = f'【A股监控】开盘前切池失败\n未找到今日 {now:%m%d}D3 watch/position 或 D4 position 的 *_YYYYMMDD_HHMMSS.csv；当前监控池未更新。'
+        msg = f'【A股监控】开盘前切池失败\n未找到今日 {now:%m%d}D3 watch 或 HOLD position 的 *_YYYYMMDD_HHMMSS.csv；当前监控池未更新。'
         append_log(f'[{now:%Y-%m-%d %H:%M:%S}] preopen_rotate missing_timestamped_sources date={now:%Y-%m-%d}')
         print(msg)
         return 0
