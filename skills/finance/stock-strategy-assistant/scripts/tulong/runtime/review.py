@@ -100,7 +100,7 @@ def render_review() -> str:
         f'- 监控标的：{len(watchlist)} 只',
         f'- 行情快照记录：{len(snapshots)} 条',
         f'- 结构化事件记录：{len(events)} 条',
-        '- 口径：候选观察、买入时机提示、风险/失效提醒；不是确定性交易指令。',
+        '- 口径：观察、买入时机提示、风险/失效提醒；不是确定性交易指令。',
         '',
         '## 个股复盘',
         '',
@@ -133,7 +133,7 @@ def render_review() -> str:
         if price <= invalid and price > 0:
             conclusion = '已跌破失效位，明日从观察池移除或只做风险跟踪。'
         elif zone_low <= price <= zone_high:
-            conclusion = '仍在候选买入观察区，明日重点看承接和是否跌破失效位。'
+            conclusion = '仍在买入观察区，明日重点看承接和是否跌破失效位。'
         elif price > zone_high:
             conclusion = '已脱离低吸区，明日不追高，等待回踩观察价附近或新结构确认。'
         else:

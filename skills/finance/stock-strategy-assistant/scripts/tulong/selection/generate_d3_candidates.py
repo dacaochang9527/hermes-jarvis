@@ -101,14 +101,14 @@ def infer_d3_label(d3_date: date) -> str:
 
 
 def parse_args(argv: list[str] | None = None) -> SelectionArgs:
-    parser = argparse.ArgumentParser(description="生成屠龙 D3 候选池：D1 首板 + D2 确认 + D3 观察标签")
+    parser = argparse.ArgumentParser(description="生成屠龙 D3 观察池：D1 首板 + D2 确认 + D3 观察标签")
     parser.add_argument("--d1-date", required=True, type=parse_yyyymmdd, help="D1 首板日期，YYYYMMDD")
     parser.add_argument("--d2-date", required=True, type=parse_yyyymmdd, help="D2 确认日期，YYYYMMDD")
     parser.add_argument("--d3-date", type=parse_yyyymmdd, help="D3 观察日期，YYYYMMDD；未传 --d3-label 时用它推导 MMDDD3")
     parser.add_argument("--d3-label", help="D3 标签，例如 0529D3；未传时由 --d3-date 推导")
     parser.add_argument("--timestamp", default=datetime.now().strftime("%Y%m%d_%H%M%S"), help="输出文件时间戳，默认当前 YYYYMMDD_HHMMSS")
-    parser.add_argument("--max-report", type=int, default=30, help="Markdown 报告最多展示多少只候选")
-    parser.add_argument("--max-candidates", type=int, default=12, help="CSV 候选池最多输出多少只")
+    parser.add_argument("--max-report", type=int, default=30, help="Markdown 报告最多展示多少只观察标的")
+    parser.add_argument("--max-candidates", type=int, default=12, help="CSV 观察池最多输出多少只")
     parser.add_argument("--project", type=Path, default=PROJECT, help="项目根目录")
     parser.add_argument("--d1-only", action="store_true", help="同时输出仅 D1 过滤结果")
     ns = parser.parse_args(argv)
@@ -372,7 +372,7 @@ def generate(args: SelectionArgs) -> OutputPaths:
         f"# {args.d3_label} 自动窄化扫描（D1={args.d1_date:%m%d}首板，D2={args.d2_date:%m%d}确认）",
         "",
         f"- D1首板池日期：{d1_date_str}",
-        f"- 主板首板候选检查：{checked} 只",
+        f"- 主板首板观察检查：{checked} 只",
         f"- 通过D2过滤规则：{len(raw)} 只",
         f"- 自动窄化后输出：{len(selected)} 只",
         "- 说明：每次生成或更新 D3 初选时先自动窄化，后续如有人工修正再另行落盘。",

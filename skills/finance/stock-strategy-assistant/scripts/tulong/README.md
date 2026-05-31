@@ -16,7 +16,7 @@ scripts/tulong         = 流程编排器 / 实际运行脚本
 - `src/stock_assistant/strategy_tulong.py` 负责把规则沉淀成可复用函数，后续应逐步减少 selection/runtime 脚本里的重复硬编码。
 - `scripts/tulong/` 负责读数据、调规则、写 CSV/Markdown、被 cron 调度和运行。
 
-文档同步约定：以后如果修改 `scripts/tulong` 目录结构、runtime/selection/legacy 分工、cron wrapper、候选池生成器参数或 D3 选股/HOLD 持仓流程，必须同步更新本 README，并视情况同步 `stock-strategy-assistant` skill 的相关 reference。
+文档同步约定：以后如果修改 `scripts/tulong` 目录结构、runtime/selection/legacy 分工、cron wrapper、观察池生成器参数或 D3 选股/HOLD 持仓流程，必须同步更新本 README，并视情况同步 `stock-strategy-assistant` skill 的相关 reference。
 
 ## runtime/：生产调度正在使用
 
@@ -40,12 +40,12 @@ scripts/tulong         = 流程编排器 / 实际运行脚本
   - 开盘前守门校验脚本。
   - 09:05 cron 调用，校验 active 池日期、stage、pool_type、20cm过滤、脚本读取一致性。
 
-## selection/：选股/候选池生成脚本
+## selection/：选股/观察池生成脚本
 
-这些是研究、自动窄化和生成候选池用的脚本，不直接被 cron 盘中调用。
+这些是研究、自动窄化和生成观察池用的脚本，不直接被 cron 盘中调用。
 
 - `selection/generate_d3_candidates.py`
-  - 当前唯一保留的通用 D3 候选池生成器。
+  - 当前唯一保留的通用 D3 观察池生成器。
   - D1 过滤规则已下沉到 `src/stock_assistant/strategy_tulong.py`：`is_main_board_10cm()`、`is_excluded_name()`、`is_first_board_from_zt_row()`、`evaluate_d1_board()`。
   - 本脚本只负责数据源读取、调用 D1/D2 规则执行器、自动窄化、写 CSV/Markdown；不再保存 `EXCLUDE_PREFIXES`、`EXCLUDE_NAME_PARTS` 或 D1 首板判定副本。
   - 参数化接收 `--d1-date`、`--d2-date`、`--d3-date` 或 `--d3-label`、`--timestamp`。

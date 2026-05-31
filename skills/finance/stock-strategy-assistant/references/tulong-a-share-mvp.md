@@ -88,7 +88,7 @@ D1_support = max(D1.open, D1.prev_close, 最近5日平台高点)
 提醒条件：
 
 ```text
-股票来自 D2 合格候选池
+股票来自 D2 合格观察池
 当前价 < D2 收盘价
 当前涨跌幅 < 0
 当前价 >= D1_support

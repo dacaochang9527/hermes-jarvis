@@ -248,7 +248,7 @@ def entry_zone(item: dict[str, Any]) -> tuple[float, float]:
         return float(item['zone_low']), float(item['zone_high'])
     trigger = float(item['trigger_price'])
     invalid = float(item['invalid_price'])
-    # 候选入场观察区：不追高，优先在观察价下方、且离失效位至少留出空间。
+    # 观察入场区：不追高，优先在观察价下方、且离失效位至少留出空间。
     low = max(invalid * 1.015, trigger * 0.985)
     high = trigger * 1.003
     return low, high
@@ -258,19 +258,19 @@ def build_advice(event: str, price: float, trigger: float, invalid: float, q: di
     low, high = max(invalid * 1.015, trigger * 0.985), trigger * 1.003
     if event in {'entry_zone', 'underwater_cross'}:
         return (
-            f'候选买入时机：仅在 {low:.2f}–{high:.2f} 区间内观察低吸/小仓试错；'
+            f'观察买入时机：仅在 {low:.2f}–{high:.2f} 区间内观察低吸/小仓试错；'
             f'若跌破 {invalid:.2f} 失效，不补仓；若快速拉离观察价，不追。'
         )
     if event == 'recover_trigger':
         return (
-            f'候选买入时机：从水下回收观察价 {trigger:.2f} 后，先看能否站稳；'
+            f'观察买入时机：从水下回收观察价 {trigger:.2f} 后，先看能否站稳；'
             '若回落不破观察价且量价温和，可作为确认型观察点。'
         )
     if event in {'strong_up', 'intraday_fade'}:
-        return '候选买入时机：当前不适合追高；等待回落到观察价附近或尾盘确认后再评估。'
+        return '观察买入时机：当前不适合追高；等待回落到观察价附近或尾盘确认后再评估。'
     if event in {'invalid', 'near_invalid', 'sharp_down'}:
-        return '候选买入时机：暂不考虑；优先看风险是否释放，跌破失效位则从观察池移除。'
-    return '候选买入时机：继续观察价格是否回到观察价附近且不破失效位。'
+        return '观察买入时机：暂不考虑；优先看风险是否释放，跌破失效位则从观察池移除。'
+    return '观察买入时机：继续观察价格是否回到观察价附近且不破失效位。'
 
 
 def status_label(event: str) -> str:
@@ -302,7 +302,7 @@ def build_action(event: str, trigger: float, invalid: float) -> str:
     if event == 'strong_up':
         return '强势不追；等回踩买点区或尾盘确认'
     if event in {'near_invalid', 'invalid', 'sharp_down'}:
-        return f'先放弃买点；跌破{invalid:.2f}移出候选'
+        return f'先放弃买点；跌破{invalid:.2f}移出观察池'
     if event == 'intraday_fade':
         return f'冲高回落先降权；只看能否回收{trigger:.2f}'
     return f'继续观察{trigger:.2f}附近承接；跌破{invalid:.2f}放弃'
@@ -344,7 +344,7 @@ def build_alerts(now: datetime, quotes: dict[str, dict[str, Any]], state: dict[s
         elif pct_from_invalid <= 0.015:
             candidates.append(('near_invalid', '接近失效位', f'当前价 {price:.2f} 距失效位 {invalid:.2f} 约 {pct_from_invalid*100:.1f}%'))
         if in_entry_zone and pct_from_invalid > 0.015:
-            candidates.append(('entry_zone', '候选买入时机观察', f'当前价 {price:.2f} 处于低吸观察区 {zone_low:.2f}–{zone_high:.2f}'))
+            candidates.append(('entry_zone', '观察买入时机', f'当前价 {price:.2f} 处于低吸观察区 {zone_low:.2f}–{zone_high:.2f}'))
         if price < trigger and pct_from_invalid > 0.015:
             event = 'underwater_cross' if crossed_under_trigger else 'underwater'
             candidates.append((event, 'D3水下观察', f'当前价 {price:.2f} 低于观察价 {trigger:.2f}（{pct_from_trigger*100:.1f}%）'))
@@ -419,7 +419,7 @@ def build_monitor_report(now: datetime, quotes: dict[str, dict[str, Any]], watch
     lines = [
         f'【A股监控】{stage_label}主板{len(watchlist)}股盘中快照',
         f'本地时间：{now:%Y-%m-%d %H:%M:%S}',
-        '口径：候选观察信号，不是确定性交易指令；请结合仓位和风险自行判断。',
+        '口径：观察信号，不是确定性交易指令；请结合仓位和风险自行判断。',
         '',
     ]
     for item in watchlist:
