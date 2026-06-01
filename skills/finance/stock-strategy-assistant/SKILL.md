@@ -15,6 +15,7 @@ metadata:
 
 > 屠龙运行时就在本 skill 目录内：`scripts/tulong/`（runtime/selection/legacy）、`src/stock_assistant/`（依赖子集）、`data/`、`reports/`、`tests/`、`pyproject.toml`、`.venv/`。
 > Hermes cron（`~/.hermes/scripts/*.sh` + `~/.hermes/cron/jobs.json` workdir）指向本 skill 根。运行命令：`cd 本skill根 && .venv/bin/python scripts/tulong/runtime/<脚本>.py`；测试：`.venv/bin/python -m pytest -q`。
+> **唯一事实源**：本 skill 根是屠龙脚本/数据的唯一事实源；原始开发仓库 `~/Documents/ai-project/a-share-stock-assistant` 已于 2026-06-01 删除，避免产物落错位置。生成 D3 名单必须 `cd` 到本 skill 根运行 `scripts/tulong/selection/generate_d3_candidates.py`，不要从其他副本生成。详见 `references/d3-generation-notes.md`。
 
 ## 适用场景
 
