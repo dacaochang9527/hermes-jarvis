@@ -9,7 +9,7 @@
 - 用 `cronjob(no_agent=True)` 创建脚本型定时任务。
 - 脚本放在 `~/.hermes/scripts/`，cron 创建时 `script` 只填相对文件名，例如 `tulong_watchdog.sh`。
 - 脚本 stdout 非空才投递；stdout 为空则静默，适合低噪音告警。
-- 监控脚本自己维护状态文件，做“每票每事件每天最多提醒一次”等去重。
+- 监控脚本维护状态文件，主要记录上一轮价格和待处理快照；当前不做“每票每事件每天一次”的告警去重，事件条件每次重新满足时都允许再次输出。
 - 定时任务建议投递到 `origin`，这样从微信发起的任务会回到当前微信会话。
 
 ## 少量 A 股实时行情数据源
@@ -44,7 +44,7 @@ for symbol, payload in re.findall(r'var hq_str_(s[hz]\\d{6})="(.*?)";', text):
 - 大幅拉升：提醒“不追高”；
 - 快速走弱：风险提醒；
 - 盘中冲高回落：异动提醒；
-- 每只票每类事件每天最多提醒一次。
+- 每次事件检测只要条件满足就允许提醒；不做“同一股票 + 同一事件 + 同一天最多一次”的去重。
 
 ## 买入时机提示与复盘日志
 
@@ -65,6 +65,34 @@ for symbol, payload in re.findall(r'var hq_str_(s[hz]\\d{6})="(.*?)";', text):
 3. 普通运行日志：`reports/alerts/<strategy>_monitor.log`，记录 fetch_error、sent N alerts、no_alert 等运行状态。
 
 收盘后可用独立脚本生成 `reports/reviews/<strategy>_review_YYYYMMDD.md`，并用 cron 在 15:10 投递。复盘报告应汇总：监控样本数、事件数、每只票触发事件、监控内高低点、当前价/收盘附近价、次日继续观察/移除/等待回踩的结论。
+
+## 微信/iLink 防限流模式
+
+当用户反馈“脚本仍在跑，但微信侧收不到消息”时，必须同时查两类证据：
+
+1. 监控脚本本地日志/cron output：确认是否仍有 stdout，例如 `~/.hermes/cron/output/<job_id>/...md`、`reports/alerts/*_monitor.log`；
+2. Hermes 网关/cron 投递日志：搜索 `rate limited`、`iLink sendmessage rate limited`、`delivery error`、对应 `job_id`。
+
+如果本地日志显示 `sent monitor_report` / `sent alert(s)`，但 gateway/agent 日志出现：
+
+```text
+[Weixin] rate limited ...
+iLink sendmessage rate limited: ret=-2
+cron.scheduler: delivery error: Weixin send failed
+```
+
+结论应明确写成：**监控没有停，微信 iLink 投递被限流**，不要误报为脚本故障或行情异常。
+
+防限流默认改法：
+
+- 只把“新单股事件”输出到 stdout；
+- 15 分钟全量快照只写本地 CSV/JSONL/日志，不再推送微信；
+- 事件与快照撞车时，不再排队补发快照；旧 `pending_snapshot` 应清空或在下一轮丢弃；
+- 同一轮/同一分钟多只股票触发时，不合并成一条摘要；仍按单股告警块分别输出，便于微信端逐条阅读和处理；
+- 状态文件只保留上一轮价格、待处理快照等运行状态；不再用 `sent` 做同日同事件去重；
+- cron output 仍会保存每次非空 stdout，可作为微信未收到时的补查凭据。
+
+这种模式牺牲“定时全量播报”，保留“真正有新事件时提醒”，适合 Weixin/iLink 易限流通道。
 
 ## 验证步骤
 

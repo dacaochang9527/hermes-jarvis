@@ -214,7 +214,7 @@ D2 确认在 D1 底池基础上执行。遇到周一/节假日必须按真实交
   - `zone_low/zone_high` 用接近突破/回收区，例如前高下方一段到前高；
   - `invalid_price` 不宜贴着当前价或昨收，否则脚本会立刻报“跌破止损”；应使用当日关键承接位、D2 收盘下方的确认失效位或用户认可的更紧失败线，并在 `note` 写明“跌回某价下方降级”。
 4. **必须同步两个文件**：同时更新人工源文件（如 `MMDDD3_watch_manual_review_YYYYMMDD_HHMMSS.csv`）和实际 active 池 `data/watchlists/tulong_active_watchlist.csv`；只改 active 会导致次日/新会话丢失，只改源文件会导致当前 watchdog 不生效。
-5. **清理状态避免误判**：清除该代码在 `sent`、`last_prices` 中的旧状态；如果刚用错误点位触发过合成验证提醒，修正点位后也要清掉该代码当天的 sent key，避免真正触发时被去重吞掉。
+5. **清理状态避免误判**：清除该代码在 `last_prices` 中的旧状态，避免上一轮价格导致穿越类事件判断失真；如果刚用错误点位触发过合成验证提醒，修正点位后重新验证用户可见文本。
 6. **验证用户可见文本**：运行脚本级验证或生成一次 `FORCE_RUN=1` 输出，确认单股行显示正确 `stage`、行业、状态、买点/强提醒区、失效线；如果立即显示“跌破止损”，优先复核 `invalid_price` 是否设置过紧。
 
 推荐 `note` 示例：
@@ -282,20 +282,21 @@ D3 快照与单股触发提醒使用同一套指标，只是时间用完整 `YYY
 - 同一轮既有事件又到 15 分钟快照点时，**事件优先**，先发事件，不叠加快照；
 - 被事件挤掉的快照不能丢，保存为待发送快照，约 3 分钟后补发；若 3 分钟后又有新事件，继续事件优先，但待发送快照可合并/替换为最新 15 分钟快照；
 - 非 15 分钟整点且无事件时静默，避免微信/iLink 限流；
-- 同一股票 + 同一事件 + 同一天最多提醒一次，避免刷屏。
+- 每次事件检测只要条件满足就允许提醒；不做“同一股票 + 同一事件 + 同一天最多一次”的去重。
 
-## 观察区 / 持仓区命名与 HOLD 持仓管理
+- 盘中推送应优先采用 Weixin/iLink 防限流模式：只推送单股事件，15 分钟全量快照只写本地文件；多只股票同轮触发时不合并摘要，按单股告警块分别输出。若用户反馈 10:45 后等时间点微信侧不再收到，先查 cron output 与 gateway/agent 日志中的 `iLink sendmessage rate limited`，不要只看 `last_status=ok` 就断定投递正常。具体排查与降噪实现见 `references/a-share-intraday-watchdog.md`。
 
-后续用户可见概念统一使用“观察区”，不再使用“候选区”；工程字段使用 `pool_type=watch` 表示未买入观察，`pool_type=position` 表示已买入持仓。持仓行 `stage` 统一为 `HOLD`，且只与 `position` 搭配，不使用 `watch`。详细概念模型见 `references/tulong-position-pool-concepts.md`。
+### 监控池组成：watch + OPEN HOLD
 
-核心口径：
+日内“实际监控池”不能只看当天 `MMDDD3_watch_*` 观察票。必须同时合并：
 
-- `D3观察区`：未买入，寻找买点/回收/失效；
-- `HOLD 持仓（已买入）`：`stage=HOLD`、`pool_type=position`。仅按事实区分 T+1 可卖性——买入当天不可卖、次日起可卖；验证期不预设买入后的卖出/加仓/止盈止损动作规则。
+- 当天最新 `MMDDD3_watch_*_YYYYMMDD_HHMMSS.csv`：未买入观察票；
+- 最新 `HOLD_position_*_YYYYMMDD_HHMMSS.csv` 中 **`position_status=open`** 的持仓：已买入且仍持有；
+- **`position_status=closed` 的 HOLD 行不进入当前监控池**，只能作为历史复盘/已完成持仓记录。
 
-可卖性由 `entry_date` 客观派生，不再靠 `stage` 是 D3 还是 D4 来判断（持仓 `stage` 现固定为 `HOLD`）。
+判断“今天有哪些股票进监控池”时，默认口径是 **watch + open HOLD**，不是只有 watch。若 active CSV 里只剩 watch，必须检查是否漏合并了 open HOLD；若 HOLD 源里只剩 closed，则不要误把它们算进监控池。
 
-## 开盘前监控池换日规则
+
 
 今天暴露的问题：开盘前实际监控池仍是前一交易日 D3，导致开盘后旧池继续触发提醒。这个问题必须作为固定流程处理，不能依赖盘中人工发现后再替换。
 
@@ -348,7 +349,7 @@ preopen_guard_check         09:05 每交易日执行，成功静默，失败 std
   - 过滤用户无权限的 20cm / 非沪深主板：`300/301/688/689`、北交所等；
   - 保留 `industry`、`trigger_price`、`invalid_price`、`zone_low`、`zone_high`、`rank`、`score`、`note`；
   - 切池前备份旧 active CSV；
-  - 重置状态：`sent={}`、`last_prices={}`、`pending_snapshot=null`；
+  - 重置状态：`last_prices={}`、`pending_snapshot=null`；
   - 写入状态元数据：`watchlist_source`、`watch_date`、`stage=MMDDD3`、`updated_at`、`filtered_out`；
   - 调用监控脚本的 `load_watchlist()` 做脚本级验证，确保不是只改了文件但运行时仍读旧硬编码池。
 2. `preopen_guard_check`
@@ -380,6 +381,7 @@ preopen_guard_check         09:05 每交易日执行，成功静默，失败 std
 
 更新监控池文件后，必须验证脚本实际读取的是新池，而不是旧硬编码池：
 
+0. **先确认运行目录**：屠龙运行时当前在本 skill 根目录内（`~/.hermes/skills/finance/stock-strategy-assistant`），不要沿用历史独立仓库路径；若聊天或旧日志出现 `/Documents/ai-project/a-share-stock-assistant` 等旧路径，必须先检查该目录是否存在，并以 skill 根目录的数据为准。
 1. `cronjob(action='list')`：确认当前启用任务、脚本名、workdir、最近运行状态、投递错误；
 2. 读取监控脚本实际 watchlist 来源，例如 `WATCHLIST_CSV_PATH` / `load_watchlist()`；当前 active 文件应为 `data/watchlists/tulong_active_watchlist.csv`；
 3. 读取实际生效 CSV，并与 `MMDDD3_watch_*_HHMMSS.csv`、`HOLD_position_*_HHMMSS.csv` 等源文件分开列；
@@ -388,6 +390,15 @@ preopen_guard_check         09:05 每交易日执行，成功静默，失败 std
 6. 替换时保留 `industry`、`zone_low`、`zone_high`、`score`、`rank`、`note`；
 7. 替换后重置或隔离状态文件：`sent`、`last_prices`、`pending_snapshot`、`watchlist_source`；
 8. 强制运行一次验证 `load_watchlist()`、`entry_zone()`、快照标题、事件 JSONL/快照 CSV 最新行。
+
+### D3 watch 与 HOLD 的查询纪律
+
+当用户问“今天监控池有哪些 / 是否能正常监控 / 先忽略 HOLD”时，必须把 **D3 watch** 与 **HOLD position** 分开回答：
+
+- 只问 `MMDDD3监控池` 且用户明确“先忽略 HOLD”时，只读取最新 `MMDDD3_watch_*_YYYYMMDD_HHMMSS.csv` 与 active 中 `stage=MMDDD3,pool_type=watch` 的行，不要混入 `HOLD`。
+- 只有在存在**当天或明确滚动续期后的** `HOLD_position_*_YYYYMMDD_HHMMSS.csv`，并且 `position_status=open` 时，才把 HOLD 作为当前应监控持仓；不要把几天前的手工/rollover 文件直接推断为今日 HOLD。
+- 若 active 池混入 `position_status=closed` 的 HOLD 行，应明确标为污染项并清理；清理 active 后必须同步修正 `tulong_d3_monitor_state.json` 里的 `watchlist_source`、`stages`、`pool_types`，避免状态仍显示包含 HOLD。
+- 回答“能否正常监控”至少核对三层：cron 任务启用且最近 `last_status=ok`，active CSV 已是今日 `MMDDD3`，state 的 `watch_date/watchlist_source/stages/pool_types` 与 active 一致。三者不一致时，不要直接说正常。
 
 ### 告警/快照展示不得硬编码日期+D几
 

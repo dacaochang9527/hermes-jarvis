@@ -144,11 +144,15 @@ def validate_watchlist_date(now: datetime, watchlist: list[dict[str, Any]]) -> b
 
 def load_state() -> dict[str, Any]:
     if not STATE_PATH.exists():
-        return {'sent': {}, 'last_prices': {}, 'pending_snapshot': None, 'last_event_run_at': None}
+        return {'last_prices': {}, 'pending_snapshot': None, 'last_event_run_at': None}
     try:
-        return json.loads(STATE_PATH.read_text(encoding='utf-8'))
+        state = json.loads(STATE_PATH.read_text(encoding='utf-8'))
+        if isinstance(state, dict):
+            state.pop('sent', None)
+            return state
     except Exception:
-        return {'sent': {}, 'last_prices': {}, 'pending_snapshot': None, 'last_event_run_at': None}
+        pass
+    return {'last_prices': {}, 'pending_snapshot': None, 'last_event_run_at': None}
 
 
 def save_state(state: dict[str, Any]) -> None:
@@ -234,10 +238,6 @@ def fetch_quotes(watchlist: list[dict[str, Any]] | None = None) -> dict[str, dic
     return quotes
 
 
-def event_key(code: str, event: str, now: datetime) -> str:
-    # 每只票每类事件每天最多提醒一次，避免刷屏。
-    return f'{now:%Y-%m-%d}:{code}:{event}'
-
 
 def format_money_yi(amount: float) -> str:
     return f'{amount / 100000000:.2f}亿' if amount else '未知'
@@ -294,6 +294,19 @@ def format_hhmm(ts: str) -> str:
         return ts[-8:-3] if ts else ''
 
 
+EVENT_PRIORITY = {
+    'invalid': 0,
+    'near_invalid': 1,
+    'sharp_down': 2,
+    'entry_zone': 3,
+    'recover_trigger': 4,
+    'strong_up': 5,
+    'intraday_fade': 6,
+    'underwater_cross': 7,
+    'underwater': 8,
+}
+
+
 def build_action(event: str, trigger: float, invalid: float) -> str:
     if event in {'entry_zone', 'underwater', 'underwater_cross'}:
         return f'只等回到买点区/回收{trigger:.2f}；跌破{invalid:.2f}放弃'
@@ -308,10 +321,9 @@ def build_action(event: str, trigger: float, invalid: float) -> str:
     return f'继续观察{trigger:.2f}附近承接；跌破{invalid:.2f}放弃'
 
 
-def build_alerts(now: datetime, quotes: dict[str, dict[str, Any]], state: dict[str, Any], watchlist: list[dict[str, Any]] | None = None) -> list[str]:
+def build_alerts(now: datetime, quotes: dict[str, dict[str, Any]], state: dict[str, Any], watchlist: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     watchlist = watchlist or WATCHLIST
-    alerts: list[str] = []
-    sent: dict[str, str] = state.setdefault('sent', {})
+    alerts: list[dict[str, Any]] = []
     last_prices: dict[str, float] = state.setdefault('last_prices', {})
 
     for item in watchlist:
@@ -395,22 +407,51 @@ def build_alerts(now: datetime, quotes: dict[str, dict[str, Any]], state: dict[s
                 'quote_time': q.get('ts', ''),
             }
             append_jsonl(EVENTS_JSONL_PATH, record)
-            key = event_key(code, ev, now)
-            if key in sent:
-                continue
-            sent[key] = now.isoformat(timespec='seconds')
             industry = item.get('industry') or '未知行业'
             hhmm = format_hhmm(q.get('ts', ''))
             stop_distance = price / invalid - 1 if invalid else 0.0
             stage = item.get('stage') or f'{now:%m%d}D3'
-            alert_lines = [
-                f'{stage} | {code} {item["name"]} | {industry} | {status_label(ev)}',
-                f'现价 {price:.2f} ({q["pct"]:+.2f}%) | 买点 {zone_low:.2f}–{zone_high:.2f} | 止损 {invalid:.2f}',
-                f'动作：{build_action(ev, trigger, invalid)}',
-                f'参考：距止损{stop_distance*100:+.1f}% | 成交额{format_money_yi(q["amount"])} | {hhmm}',
-            ]
-            alerts.append('```text\n' + '\n'.join(alert_lines) + '\n```')
+            alerts.append({
+                'event': ev,
+                'stage': stage,
+                'code': code,
+                'name': item['name'],
+                'industry': industry,
+                'price': price,
+                'pct': q['pct'],
+                'zone_low': zone_low,
+                'zone_high': zone_high,
+                'invalid': invalid,
+                'trigger': trigger,
+                'stop_distance': stop_distance,
+                'amount': q['amount'],
+                'hhmm': hhmm,
+            })
     return alerts
+
+def format_alert(alert: dict[str, Any]) -> str:
+    event = str(alert['event'])
+    trigger = float(alert['trigger'])
+    invalid = float(alert['invalid'])
+    lines = [
+        f'{alert["stage"]} | {alert["code"]} {alert["name"]} | {alert["industry"]} | {status_label(event)}',
+        f'现价 {float(alert["price"]):.2f} ({float(alert["pct"]):+.2f}%) | 买点 {float(alert["zone_low"]):.2f}–{float(alert["zone_high"]):.2f} | 止损 {invalid:.2f}',
+        f'动作：{build_action(event, trigger, invalid)}',
+        f'参考：距止损{float(alert["stop_distance"])*100:+.1f}% | 成交额{format_money_yi(float(alert["amount"]))} | {alert["hhmm"]}',
+    ]
+    return '\n'.join(lines)
+
+
+def format_alert_summary(alerts: list[dict[str, Any]]) -> str:
+    ordered = sorted(alerts, key=lambda a: (EVENT_PRIORITY.get(str(a.get('event')), 99), str(a.get('code'))))
+    if len(ordered) == 1:
+        return '```text\n' + format_alert(ordered[0]) + '\n```'
+    header = f'【A股监控】同轮事件合并 {len(ordered)}只｜{ordered[0].get("hhmm", "")}'
+    blocks = [header]
+    for i, alert in enumerate(ordered, 1):
+        blocks.append(f'{i}. ' + format_alert(alert))
+    return '```text\n' + '\n\n'.join(blocks) + '\n```'
+
 
 def build_monitor_report(now: datetime, quotes: dict[str, dict[str, Any]], watchlist: list[dict[str, Any]] | None = None) -> str:
     watchlist = watchlist or WATCHLIST
@@ -490,34 +531,34 @@ def main() -> int:
         append_log(f'[{now:%Y-%m-%d %H:%M:%S}] fetch_error {type(e).__name__}: {e}')
         return 0
 
-    alerts: list[str] = []
+    alerts: list[dict[str, Any]] = []
     if should_run_event_check(now):
         alerts = build_alerts(now, quotes, state, watchlist)
     else:
         append_log(f'[{now:%Y-%m-%d %H:%M:%S}] skipped event_check minute={now.minute}')
 
     if alerts:
-        # 15分钟快照点与事件撞车时：先发事件，快照生成后延迟 3 分钟补发。
+        # 15分钟快照点与事件撞车时：快照只落本地，不再排队推送，避免微信/iLink 限流。
         if should_generate_snapshot(now):
-            store_pending_snapshot(state, now, build_monitor_report(now, quotes, watchlist))
-            append_log(f'[{now:%Y-%m-%d %H:%M:%S}] queued delayed_snapshot after event(s)')
+            build_monitor_report(now, quotes, watchlist)
+            append_log(f'[{now:%Y-%m-%d %H:%M:%S}] wrote local snapshot after event(s)')
         save_state(state)
-        out = '\n\n'.join(alerts)
-        append_log(f'[{now:%Y-%m-%d %H:%M:%S}] sent {len(alerts)} alert(s)')
+        if len(alerts) == 1:
+            out = format_alert_summary(alerts)
+        else:
+            out = '\n\n'.join('```text\n' + format_alert(alert) + '\n```' for alert in alerts)
+        append_log(f'[{now:%Y-%m-%d %H:%M:%S}] sent separate_alert events={len(alerts)}')
         print(out)
     else:
         if pending_snapshot_due(now, state):
-            report = pop_pending_snapshot(state)
+            pop_pending_snapshot(state)
             save_state(state)
-            if report:
-                append_log(f'[{now:%Y-%m-%d %H:%M:%S}] sent delayed_snapshot')
-                print(report)
+            append_log(f'[{now:%Y-%m-%d %H:%M:%S}] dropped pending_snapshot local_only')
             return 0
         if should_generate_snapshot(now):
-            report = build_monitor_report(now, quotes, watchlist)
+            build_monitor_report(now, quotes, watchlist)
             save_state(state)
-            append_log(f'[{now:%Y-%m-%d %H:%M:%S}] sent monitor_report quotes={len(quotes)}')
-            print(report)
+            append_log(f'[{now:%Y-%m-%d %H:%M:%S}] wrote local snapshot quotes={len(quotes)}')
         else:
             save_state(state)
             append_log(f'[{now:%Y-%m-%d %H:%M:%S}] silent no_event_no_snapshot quotes={len(quotes)}')
