@@ -119,6 +119,11 @@ def normalize_source_rows(src: Path) -> tuple[list[dict[str, str]], list[str]]:
                 raise RuntimeError(f'position rows must use stage=HOLD: code={code} stage={stage} source={src.name}')
             if str(stage) == 'HOLD' and pool_type != 'position':
                 raise RuntimeError(f'HOLD only accepts position rows: code={code} pool_type={pool_type} source={src.name}')
+            if pool_type == 'position':
+                position_status = (row.get('position_status') or '').strip().lower()
+                if position_status != 'open':
+                    filtered.append(f'{code} {row.get("name", "")} position_status={position_status or "空"}'.strip())
+                    continue
             if pool_type == 'watch' and not str(stage).endswith('D3'):
                 raise RuntimeError(f'watch rows must use MMDDD3 stage: code={code} stage={stage} source={src.name}')
             out = {name: row.get(name, '') for name in ACTIVE_FIELDNAMES}
@@ -150,7 +155,7 @@ def normalize_source_rows(src: Path) -> tuple[list[dict[str, str]], list[str]]:
     return rows, filtered
 
 
-def write_active_watchlist(sources: list[Path], now: datetime) -> tuple[int, list[str], list[str]]:
+def write_active_watchlist(sources: list[Path], now: datetime) -> tuple[int, list[str], list[str], list[str], list[str]]:
     rows: list[dict[str, str]] = []
     filtered: list[str] = []
     source_names: list[str] = []
@@ -173,7 +178,9 @@ def write_active_watchlist(sources: list[Path], now: datetime) -> tuple[int, lis
         writer = csv.DictWriter(f, fieldnames=ACTIVE_FIELDNAMES, lineterminator='\n')
         writer.writeheader()
         writer.writerows(rows)
-    return len(rows), filtered, source_names
+    stages = sorted({row.get('stage', '') for row in rows if row.get('stage')})
+    pool_types = sorted({row.get('pool_type', '') for row in rows if row.get('pool_type')})
+    return len(rows), filtered, source_names, stages, pool_types
 
 
 def active_state_matches(now: datetime) -> bool:
@@ -250,7 +257,7 @@ def main() -> int:
         return 0
 
     try:
-        count, filtered, source_names = write_active_watchlist(sources, now)
+        count, filtered, source_names, active_stages, active_pool_types = write_active_watchlist(sources, now)
         validation = validate_active_watchlist(now)
         if not validation.get('ok'):
             print(f'【A股监控】开盘前切池后校验异常\n{now:%m%d}｜sources={source_names}\n问题：{json.dumps(validation, ensure_ascii=False)}')
@@ -267,8 +274,8 @@ def main() -> int:
         'last_event_run_at': None,
         'watchlist_source': source_names,
         'watch_date': now.strftime('%Y-%m-%d'),
-        'stages': sorted({infer_stage_pool(src)[0] for src in sources}),
-        'pool_types': sorted({infer_stage_pool(src)[1] for src in sources}),
+        'stages': active_stages,
+        'pool_types': active_pool_types,
         'updated_at': now.isoformat(timespec='seconds'),
         'filtered_out': filtered,
     }

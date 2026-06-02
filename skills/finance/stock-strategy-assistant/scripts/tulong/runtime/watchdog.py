@@ -38,6 +38,12 @@ def load_watchlist() -> list[dict[str, Any]]:
                 code = str(row.get('code', '')).zfill(6)
                 if not code:
                     continue
+                if row.get('pool_type') == 'position' and (row.get('position_status') or '').strip().lower() != 'open':
+                    append_log(
+                        f'[{datetime.now():%Y-%m-%d %H:%M:%S}] skip_closed_position '
+                        f'code={code} status={row.get("position_status") or "空"}'
+                    )
+                    continue
                 items.append({
                     'code': code,
                     'name': row.get('name') or code,
@@ -383,8 +389,9 @@ def build_alerts(now: datetime, quotes: dict[str, dict[str, Any]], state: dict[s
                 'entry_zone_high': round(zone_high, 4),
                 'quote_time': q.get('ts', ''),
             })
+            continue
 
-        for ev, title, reason in candidates:
+        for ev, title, reason in sorted(candidates, key=lambda c: EVENT_PRIORITY.get(c[0], 99))[:1]:
             record = {
                 'local_time': now.isoformat(timespec='seconds'),
                 'event': ev,
@@ -543,11 +550,18 @@ def main() -> int:
             build_monitor_report(now, quotes, watchlist)
             append_log(f'[{now:%Y-%m-%d %H:%M:%S}] wrote local snapshot after event(s)')
         save_state(state)
-        if len(alerts) == 1:
-            out = format_alert_summary(alerts)
-        else:
-            out = '\n\n'.join('```text\n' + format_alert(alert) + '\n```' for alert in alerts)
-        append_log(f'[{now:%Y-%m-%d %H:%M:%S}] sent separate_alert events={len(alerts)}')
+        ordered = sorted(alerts, key=lambda a: (EVENT_PRIORITY.get(str(a.get('event')), 99), str(a.get('code'))))
+        visible = ordered[:3]
+        dropped = len(ordered) - len(visible)
+        lines = []
+        for alert in visible:
+            if lines:
+                lines.append('')
+            lines.append(format_alert(alert))
+        if dropped > 0:
+            lines.extend(['', f'另有 {dropped} 个较低优先级事件已只写入本地日志，避免微信/iLink 限流。'])
+        out = '```text\n' + '\n'.join(lines) + '\n```'
+        append_log(f'[{now:%Y-%m-%d %H:%M:%S}] sent capped_alert events={len(alerts)} visible={len(visible)} dropped={dropped}')
         print(out)
     else:
         if pending_snapshot_due(now, state):

@@ -140,7 +140,7 @@ MVP 优先顺序：
 - `references/tulong-a-share-mvp.md`：**历史底稿 / 原始战法规则化**。保留早期 D1–D3 状态机、口头规则、正反案例、回测背景；若与当前主规则冲突，以 `tulong-selection-and-monitoring.md` 为准。
 - `references/a-share-intraday-watchdog.md`：**工程运行方案**。维护少量自选股盘中监控的 watchdog、cron/no_agent、行情接口、日志、JSONL/CSV、去重、静默输出等实现方式。
 - `references/tulong-script-organization.md`：**脚本目录/cron迁移方案**。维护 `scripts/tulong/runtime|selection|legacy` 分层、Hermes cron wrapper 迁移、README、验证和“完成/未验证”汇报边界。
-- `references/tulong-parameterized-selection.md`：**参数化观察池生成器方案**。维护把写死日期的一次性 D3 选股脚本改为 `generate_d3_candidates.py --d1-date --d2-date --d3-date/--d3-label` 的 CLI、输出命名、测试和验证步骤。
+- `references/tulong-0601-d3-validation-notes.md`：**0601D3 样本验证笔记**。保存 0601D3 D1/D3 四象限、表现好坏样本、策略修订候选，以及本次会话确认的告警策略变更；用于后续多日样本验证，不是最终规则。
 
 ### 屠龙 D3 选股与持仓监控专题
 

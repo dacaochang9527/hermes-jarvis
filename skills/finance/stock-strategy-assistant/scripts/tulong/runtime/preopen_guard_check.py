@@ -104,6 +104,8 @@ def validate(now: datetime) -> tuple[list[str], dict[str, Any]]:
             errors.append(f'{code} 持仓行stage应为HOLD，当前={stage}')
         if stage == 'HOLD' and pool_type != 'position':
             errors.append(f'{code} HOLD只允许持仓position，当前pool_type={pool_type}')
+        if pool_type == 'position' and row.get('position_status', '').strip().lower() != 'open':
+            errors.append(f'{code} 已清仓HOLD不应进入监控池：position_status={row.get("position_status", "") or "空"}')
 
     if bad_prefix:
         errors.append('实际监控池混入非沪深主板/20cm标的：' + '、'.join(bad_prefix))

@@ -35,6 +35,7 @@ scripts/tulong         = 流程编排器 / 实际运行脚本
   - 开盘前切池脚本。
   - 08:50 cron 调用，合并今日 `MMDDD3_watch_*` 观察源与最新 `HOLD_position_*` 持仓源到 active 池。
   - HOLD 只接收 position 源文件；若混入 HOLD/watch 行会被拒绝。
+  - `position_status=closed` 的 HOLD 行视为已清仓历史记录，只写入 `filtered_out`，不进入 active 池；state 的 `stages/pool_types` 以实际入池行重新计算。
 
 - `runtime/preopen_guard_check.py`
   - 开盘前守门校验脚本。
