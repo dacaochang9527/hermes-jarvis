@@ -284,6 +284,6 @@ When executing, use the `subagent-driven-development` skill:
 
 ## Session-Specific References
 
-- `references/a-share-stock-signal-assistant.md` — 个人 A 股中短线/屠龙战术信号助手的 MVP 架构、策略规则化、东方财富 JSON 解析与安全边界。
+
 
 **A good plan makes implementation obvious.**

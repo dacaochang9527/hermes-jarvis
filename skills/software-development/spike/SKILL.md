@@ -194,7 +194,7 @@ Propose 2-4 candidates as Given/When/Then. Let the user pick.
 
 ## Reference Notes
 
-- `references/a-share-data-source-fallbacks.md` — A股历史日线数据源降级经验：东方财富接口在浏览器可访问但 CLI/自动化失败时，如何切换 AkShare 新浪日线源、处理 Tushare 权限、并用正反案例验证策略。
+
 
 ## Attribution
 
