@@ -25,6 +25,8 @@ scripts/tulong         = 流程编排器 / 实际运行脚本
 - `runtime/watchdog.py`
   - 盘中监控脚本。
   - 读取 `data/watchlists/tulong_active_watchlist.csv`。
+  - 当前 cron 每分钟调用一次：每分钟拉取新浪行情、写本地快照/事件状态；微信提醒按 5 分钟窗口节流释放。
+  - 同一只股票在 5 分钟窗口内若多次触发，只保留优先级最高的一条用于微信；所有事件和快照仍写入本地日志，便于复盘。
   - 写入 `reports/alerts/tulong_d3_monitor.log`、`tulong_d3_events_YYYYMMDD.jsonl`、`tulong_d3_snapshots_YYYYMMDD.csv`。
 
 - `runtime/review.py`

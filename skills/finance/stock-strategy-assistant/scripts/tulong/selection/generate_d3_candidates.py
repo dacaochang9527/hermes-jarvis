@@ -19,6 +19,7 @@ from stock_assistant.strategy_tulong import (  # noqa: E402
     evaluate_d1_board,
     hhmm_to_int,
     is_d2_pullback,
+    is_d2_strong_continuation,
     is_d2_balanced_cross,
     safe_float,
 )
@@ -162,6 +163,7 @@ def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
     first_seal_i = hhmm_to_int(row.get("首次封板时间"))
     breaks = safe_float(row.get("炸板次数"))
     fund = safe_float(row.get("封板资金"))
+    strong_continuation, _ = is_d2_strong_continuation(d1, d2, support)
 
     score = 50.0
     notes = []
@@ -195,7 +197,9 @@ def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
     else:
         score -= 20; notes.append(f"D2量比超过3倍{vol_ratio:.2f}"); flags.append("量能过大")
 
-    if close_below_high > 0.08:
+    if strong_continuation:
+        score += 16; notes.append("D2强势延续"); flags.append("strong_continuation")
+    elif close_below_high > 0.08:
         score -= 12; notes.append("D2上引线太长"); flags.append("上引线过长")
     elif close_below_high >= 0.05:
         score += 3; notes.append("D2回落充分")
@@ -232,7 +236,10 @@ def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
         score += 3; notes.append("换手适中")
 
     if d2.pct_chg is not None and d2.pct_chg > 7:
-        score -= 10; notes.append("D2仍大涨，容易变追高"); flags.append("D2仍大涨")
+        if strong_continuation:
+            score += 5; notes.append("D2高强度延续，归入强势确认观察")
+        else:
+            score -= 10; notes.append("D2仍大涨，容易变追高"); flags.append("D2仍大涨")
     if d2.pct_chg is not None and d2.pct_chg < -5:
         score -= 5; notes.append("D2走弱偏多"); flags.append("D2走弱")
 
@@ -348,6 +355,9 @@ def generate(args: SelectionArgs) -> OutputPaths:
         vol_ratio = d2.volume / d1.volume if d1.volume else 9.99
         pullback = 1 - d2.close / d2.high if d2.high else 0
         zl, zh = entry_zone(d2.close, support)
+        strong_continuation, _ = is_d2_strong_continuation(d1, d2, support)
+        if strong_continuation:
+            zl, zh = d2.close * 0.985, d2.close * 1.003
         if zl > zh:
             rejects.append((code, name, f"观察区倒挂 {zl:.2f}>{zh:.2f}"))
             continue

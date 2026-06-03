@@ -1,0 +1,15 @@
+{
+  "watchlist_source": "0603D3_watch_manual_review_20260603_082941.csv + HOLD_position_manual_20260602_210833.csv",
+  "watch_date": "2026-06-03",
+  "stages": [
+    "0603D3",
+    "HOLD"
+  ],
+  "pool_types": [
+    "position",
+    "watch"
+  ],
+  "updated_at": "2026-06-03T08:29:41+08:00",
+  "last_prices": {},
+  "pending_snapshot": null
+}

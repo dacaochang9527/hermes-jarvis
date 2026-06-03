@@ -8,8 +8,10 @@
 
 - 用 `cronjob(no_agent=True)` 创建脚本型定时任务。
 - 脚本放在 `~/.hermes/scripts/`，cron 创建时 `script` 只填相对文件名，例如 `tulong_watchdog.sh`。
+- 当前灵敏模式：cron 每分钟启动一次 watchdog，脚本每分钟拉取新浪行情并执行事件判断，写本地快照/JSONL/运行日志。
+- 微信提醒按 5 分钟窗口节流释放：窗口内先把单股事件写入 `pending_alerts`，到 5 分钟边界再输出 stdout 触发投递；同一只股票在窗口内只保留优先级最高的一条用于微信。
 - 脚本 stdout 非空才投递；stdout 为空则静默，适合低噪音告警。
-- 监控脚本维护状态文件，主要记录上一轮价格和待处理快照；当前不做“每票每事件每天一次”的告警去重，事件条件每次重新满足时都允许再次输出。
+- 监控脚本维护状态文件，主要记录上一轮价格、待发送事件和待处理快照；当前不做“每票每事件每天一次”的告警去重，事件条件每次重新满足时都允许再次记录，并按 5 分钟窗口节流投递。
 - 定时任务建议投递到 `origin`，这样从微信发起的任务会回到当前微信会话。
 
 ## 少量 A 股实时行情数据源
@@ -72,6 +74,23 @@ for symbol, payload in re.findall(r'var hq_str_(s[hz]\\d{6})="(.*?)";', text):
 
 1. 监控脚本本地日志/cron output：确认是否仍有 stdout，例如 `~/.hermes/cron/output/<job_id>/...md`、`reports/alerts/*_monitor.log`；
 2. Hermes 网关/cron 投递日志：搜索 `rate limited`、`iLink sendmessage rate limited`、`delivery error`、对应 `job_id`。
+
+### 区分监控停了、5分钟静默、微信限流
+
+用户问“监控停了吗 / 是不是又限流了”时，不要只凭微信是否收到消息判断。固定核对顺序：
+
+1. `cronjob(action='list')` 看盘中 watchdog：`enabled/state/last_run_at/next_run_at/last_status/last_delivery_error`。
+   - `enabled=false` 或 `state=paused`：任务确实暂停；
+   - `enabled=true`、`state=scheduled`、`last_status=ok`：任务仍在调度。
+2. 查 `reports/alerts/tulong_d3_monitor.log` 最近几行：
+   - `silent minute_check quotes=N new_alerts=M pending_alerts=K` 表示每分钟行情和事件检测正常，只是当前分钟没有 stdout；
+   - `sent queued_alert events=N visible=M dropped=K` 表示 5 分钟窗口已释放微信提醒；
+   - `fetch_error` 才是行情接口/脚本运行问题。
+3. 查最新 `~/.hermes/cron/output/<job_id>/YYYY-MM-DD_HH-MM-SS.md`：
+   - `Status: silent (empty output)` 是正常静默，不等于停；
+   - 有 fenced code block 的单股告警代表脚本输出过，若微信没收到再查投递错误。
+4. 只有当 `last_delivery_error` 或 Hermes 网关日志出现 `iLink sendmessage rate limited` / `Weixin send failed`，才判断为微信限流。
+5. 当前灵敏模式下，非 5 分钟释放点即使已经有 `pending_alerts` 也会静默；例如 09:53/09:54 记录事件，09:55 才输出提醒。这类情况应答为“监控正常，处于 5 分钟节流窗口”，不要误报停机或限流。
 
 如果本地日志显示 `sent monitor_report` / `sent alert(s)`，但 gateway/agent 日志出现：
 

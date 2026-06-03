@@ -16,7 +16,7 @@ from stock_assistant.strategy_tulong import (
 )
 
 
-def bar(offset, open_, high, low, close, prev_close, volume=100, limit_up=11):
+def bar(offset, open_, high, low, close, prev_close, volume=100, limit_up=11.0):
     return DailyBar(
         code="603912",
         name="佳力图",
@@ -58,6 +58,14 @@ def test_d2_pullback_accepts_volume_between_two_and_three_when_other_conditions_
     ok, reason = is_d2_pullback(d1, d2, estimate_d1_support(d1))
     assert ok, reason
     assert "2-3倍" in reason
+
+
+def test_d2_pullback_accepts_strong_continuation_without_pullback():
+    d1 = bar(1, 10, 11, 10, 10.98, 9.9, volume=100, limit_up=11)
+    d2 = bar(2, 11.5, 12.08, 11.3, 12.08, 10.98, volume=180, limit_up=12.08)
+    ok, reason = is_d2_pullback(d1, d2, estimate_d1_support(d1))
+    assert ok, reason
+    assert "强势延续" in reason
 
 
 def test_d2_pullback_rejects_volume_more_than_three_times_d1():

@@ -76,14 +76,23 @@ TRADING_WINDOWS = [
 ]
 
 
+ALERT_FLUSH_INTERVAL_MINUTES = 5
+SNAPSHOT_INTERVAL_MINUTES = 15
+
+
 def should_run_event_check(now: datetime) -> bool:
-    # 每 5 分钟检测事件；FORCE_RUN 用于手动验证。
-    return os.getenv('FORCE_RUN') == '1' or now.minute % 5 == 0
+    # 每分钟拉行情并检测事件；FORCE_RUN 用于手动验证。
+    return True
+
+
+def should_flush_alerts(now: datetime) -> bool:
+    # 微信提醒按 5 分钟节流释放；本地行情/事件仍每分钟记录。
+    return os.getenv('FORCE_RUN') == '1' or now.minute % ALERT_FLUSH_INTERVAL_MINUTES == 0
 
 
 def should_generate_snapshot(now: datetime) -> bool:
-    # 快照内容每 15 分钟生成一次。
-    return now.minute % 15 == 0
+    # 快照内容每 15 分钟生成一次，只写本地。
+    return now.minute % SNAPSHOT_INTERVAL_MINUTES == 0
 
 
 def pending_snapshot_due(now: datetime, state: dict[str, Any]) -> bool:
@@ -149,16 +158,27 @@ def validate_watchlist_date(now: datetime, watchlist: list[dict[str, Any]]) -> b
 
 
 def load_state() -> dict[str, Any]:
+    default_state = {
+        'last_prices': {},
+        'pending_snapshot': None,
+        'pending_alerts': [],
+        'last_event_run_at': None,
+        'last_alert_flush_at': None,
+    }
     if not STATE_PATH.exists():
-        return {'last_prices': {}, 'pending_snapshot': None, 'last_event_run_at': None}
+        return default_state.copy()
     try:
         state = json.loads(STATE_PATH.read_text(encoding='utf-8'))
         if isinstance(state, dict):
             state.pop('sent', None)
+            for key, value in default_state.items():
+                state.setdefault(key, value.copy() if isinstance(value, dict | list) else value)
+            if not isinstance(state.get('pending_alerts'), list):
+                state['pending_alerts'] = []
             return state
     except Exception:
         pass
-    return {'last_prices': {}, 'pending_snapshot': None, 'last_event_run_at': None}
+    return default_state.copy()
 
 
 def save_state(state: dict[str, Any]) -> None:
@@ -460,6 +480,41 @@ def format_alert_summary(alerts: list[dict[str, Any]]) -> str:
     return '```text\n' + '\n\n'.join(blocks) + '\n```'
 
 
+def alert_sort_key(alert: dict[str, Any]) -> tuple[int, str]:
+    return EVENT_PRIORITY.get(str(alert.get('event')), 99), str(alert.get('code', ''))
+
+
+def queue_pending_alerts(state: dict[str, Any], alerts: list[dict[str, Any]], now: datetime) -> None:
+    if not alerts:
+        return
+    pending = state.setdefault('pending_alerts', [])
+    if not isinstance(pending, list):
+        pending = []
+        state['pending_alerts'] = pending
+    by_code: dict[str, dict[str, Any]] = {
+        str(alert.get('code', '')): alert
+        for alert in pending
+        if isinstance(alert, dict) and alert.get('code')
+    }
+    for alert in alerts:
+        queued = dict(alert)
+        queued['queued_at'] = now.isoformat(timespec='seconds')
+        code = str(queued.get('code', ''))
+        old = by_code.get(code)
+        if old is None or alert_sort_key(queued) <= alert_sort_key(old):
+            by_code[code] = queued
+    state['pending_alerts'] = sorted(by_code.values(), key=alert_sort_key)
+
+
+def pop_pending_alerts(state: dict[str, Any]) -> list[dict[str, Any]]:
+    pending = state.get('pending_alerts')
+    state['pending_alerts'] = []
+    if not isinstance(pending, list):
+        return []
+    return sorted([alert for alert in pending if isinstance(alert, dict)], key=alert_sort_key)
+
+
+
 def build_monitor_report(now: datetime, quotes: dict[str, dict[str, Any]], watchlist: list[dict[str, Any]] | None = None) -> str:
     watchlist = watchlist or WATCHLIST
     stages = sorted({str(item.get('stage') or f'{now:%m%d}D3') for item in watchlist})
@@ -541,16 +596,20 @@ def main() -> int:
     alerts: list[dict[str, Any]] = []
     if should_run_event_check(now):
         alerts = build_alerts(now, quotes, state, watchlist)
+        state['last_event_run_at'] = now.isoformat(timespec='seconds')
+        queue_pending_alerts(state, alerts, now)
     else:
         append_log(f'[{now:%Y-%m-%d %H:%M:%S}] skipped event_check minute={now.minute}')
 
-    if alerts:
+    queued_alerts = pop_pending_alerts(state) if should_flush_alerts(now) else []
+    if queued_alerts:
         # 15分钟快照点与事件撞车时：快照只落本地，不再排队推送，避免微信/iLink 限流。
         if should_generate_snapshot(now):
             build_monitor_report(now, quotes, watchlist)
-            append_log(f'[{now:%Y-%m-%d %H:%M:%S}] wrote local snapshot after event(s)')
+            append_log(f'[{now:%Y-%m-%d %H:%M:%S}] wrote local snapshot after queued event(s)')
+        state['last_alert_flush_at'] = now.isoformat(timespec='seconds')
         save_state(state)
-        ordered = sorted(alerts, key=lambda a: (EVENT_PRIORITY.get(str(a.get('event')), 99), str(a.get('code'))))
+        ordered = sorted(queued_alerts, key=alert_sort_key)
         visible = ordered[:3]
         dropped = len(ordered) - len(visible)
         lines = []
@@ -561,7 +620,7 @@ def main() -> int:
         if dropped > 0:
             lines.extend(['', f'另有 {dropped} 个较低优先级事件已只写入本地日志，避免微信/iLink 限流。'])
         out = '```text\n' + '\n'.join(lines) + '\n```'
-        append_log(f'[{now:%Y-%m-%d %H:%M:%S}] sent capped_alert events={len(alerts)} visible={len(visible)} dropped={dropped}')
+        append_log(f'[{now:%Y-%m-%d %H:%M:%S}] sent queued_alert events={len(queued_alerts)} visible={len(visible)} dropped={dropped}')
         print(out)
     else:
         if pending_snapshot_due(now, state):
@@ -572,10 +631,10 @@ def main() -> int:
         if should_generate_snapshot(now):
             build_monitor_report(now, quotes, watchlist)
             save_state(state)
-            append_log(f'[{now:%Y-%m-%d %H:%M:%S}] wrote local snapshot quotes={len(quotes)}')
+            append_log(f'[{now:%Y-%m-%d %H:%M:%S}] wrote local snapshot quotes={len(quotes)} pending_alerts={len(state.get("pending_alerts", []))}')
         else:
             save_state(state)
-            append_log(f'[{now:%Y-%m-%d %H:%M:%S}] silent no_event_no_snapshot quotes={len(quotes)}')
+            append_log(f'[{now:%Y-%m-%d %H:%M:%S}] silent minute_check quotes={len(quotes)} new_alerts={len(alerts)} pending_alerts={len(state.get("pending_alerts", []))}')
     return 0
 
 

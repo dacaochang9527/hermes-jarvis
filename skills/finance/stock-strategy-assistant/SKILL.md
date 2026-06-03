@@ -140,12 +140,13 @@ MVP 优先顺序：
 - `references/tulong-a-share-mvp.md`：**历史底稿 / 原始战法规则化**。保留早期 D1–D3 状态机、口头规则、正反案例、回测背景；若与当前主规则冲突，以 `tulong-selection-and-monitoring.md` 为准。
 - `references/a-share-intraday-watchdog.md`：**工程运行方案**。维护少量自选股盘中监控的 watchdog、cron/no_agent、行情接口、日志、JSONL/CSV、去重、静默输出等实现方式。
 - `references/tulong-script-organization.md`：**脚本目录/cron迁移方案**。维护 `scripts/tulong/runtime|selection|legacy` 分层、Hermes cron wrapper 迁移、README、验证和“完成/未验证”汇报边界。
+- `references/tulong-d3-strong-continuation-generation.md`：**D3强势延续生成修正笔记**。记录 0601/0602 复盘后确认的工作流纠偏：不能只把漏掉强势票作为收盘雷达记录，应把其 D1/D2 特征前置回生成逻辑，形成低吸路径 + 强势延续路径，并注意单一 watch 容量会挤出低吸候选。
 
 ### 屠龙 D3 选股与持仓监控专题
 
 当用户讨论“屠龙战术”、D3观察区、HOLD 持仓、日期+D几（如 0527D3）、盘中提醒、买点/止损/参与区、监控池替换时，必须加载：`references/tulong-selection-and-monitoring.md`。
 
-摘要：D3 观察区 = 低吸可执行性 AND 强势潜质；D3 看买点区、回收观察价、止损；买入后即转为 `HOLD` 持仓（无日期前缀，按 `entry_date` 派生可卖性），验证期不预设买入后卖出/加仓策略（已移除，待验证后另定）；事件检测 5 分钟，快照 15 分钟但默认只落本地，单股事件触发即推送微信；多股同轮不合并摘要，按单股告警块输出；不做“同一股票+同一事件+同一天最多一次”的告警去重，条件每次满足都允许再次提醒。
+摘要：D3 观察区 = 低吸可执行性 AND 强势潜质；D3 看买点区、回收观察价、止损；买入后即转为 `HOLD` 持仓（无日期前缀，按 `entry_date` 派生可卖性），验证期不预设买入后卖出/加仓策略（已移除，待验证后另定）；行情拉取与事件检测每 1 分钟执行，分钟级事件写入本地 JSONL/快照/日志；微信提醒按 5 分钟窗口从 `pending_alerts` 节流释放，同一只股票窗口内只保留优先级最高的一条用于微信；15 分钟快照默认只落本地；多股同轮不合并摘要，按单股告警块输出；不做“同一股票+同一事件+同一天最多一次”的告警去重，条件每次满足都允许再次记录并进入提醒窗口。
 
 ### 大盘/情绪过滤
 

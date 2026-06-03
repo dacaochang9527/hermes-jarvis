@@ -86,7 +86,27 @@ def is_d1_first_board(today: DailyBar, yesterday: DailyBar) -> bool:
     )
 
 
+def is_d2_strong_continuation(d1: DailyBar, d2: DailyBar, d1_support: float) -> tuple[bool, str]:
+    volume_ratio = d2.volume / d1.volume if d1.volume else float("inf")
+    close_below_high = 1 - (d2.close / d2.high) if d2.high else 0
+    close_near_limit = d2.limit_up_price is not None and d2.close >= d2.limit_up_price * 0.995
+    close_strong = d2.pct_chg is not None and d2.pct_chg >= 5 and close_below_high <= 0.025
+    if not (close_near_limit or close_strong):
+        return False, ""
+    if volume_ratio > 3:
+        return False, f"D2成交量/D1={volume_ratio:.2f}，超过3倍"
+    if d2.close < d1_support:
+        return False, "D2收盘跌破D1支撑位"
+    return True, f"D2强势延续，量比{volume_ratio:.2f}，收盘贴近高点"
+
+
 def is_d2_pullback(d1: DailyBar, d2: DailyBar, d1_support: float) -> tuple[bool, str]:
+    strong_ok, strong_reason = is_d2_strong_continuation(d1, d2, d1_support)
+    if strong_ok:
+        return True, strong_reason
+    if strong_reason:
+        return False, strong_reason
+
     volume_ratio = d2.volume / d1.volume if d1.volume else float("inf")
     open_gap = (d2.open / d1.close) - 1 if d1.close else 0
     high_above_open = (d2.high / d2.open) - 1 if d2.open else 0
