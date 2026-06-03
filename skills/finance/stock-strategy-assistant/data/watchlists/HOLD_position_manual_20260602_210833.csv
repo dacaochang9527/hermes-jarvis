@@ -1,4 +1,4 @@
 code,name,industry,stage,pool_type,source_file,trigger_price,invalid_price,zone_low,zone_high,rank,score,note,entry_date,entry_stage,entry_price,quantity,sellable_quantity,cost_amount,position_status
-000799,酒鬼酒,白酒Ⅱ,HOLD,position,HOLD_position_manual_20260602_210833.csv,45.30,41.58,44.62,45.44,6,88.0,0602D3买入｜成本46.200｜数量100｜HOLD持仓,2026-06-02,0602D3,46.200,100,0,4625.04,open
-600979,广安爱众,电力,HOLD,position,HOLD_position_manual_20260602_210833.csv,5.27,4.82,5.19,5.29,2,81.0,0602D3买入｜成本5.200｜数量1000｜HOLD持仓,2026-06-02,0602D3,5.200,1000,0,5205.05,open
-001269,欧晶科技,光伏设备,HOLD,position,HOLD_position_manual_20260602_210833.csv,26.08,24.22,25.69,26.16,8,79.0,0602D3买入｜成本25.930｜数量200｜HOLD持仓,2026-06-02,0602D3,25.930,200,0,5191.05,open
+000799,酒鬼酒,白酒Ⅱ,HOLD,position,HOLD_position_manual_20260602_210833.csv,45.30,41.58,44.62,45.44,6,88.0,0602D3买入｜0603D3卖出均价44.020｜实现毛利-218.00｜含费净利-229.54,2026-06-02,0602D3,46.200,0,0,4625.04,closed
+600979,广安爱众,电力,HOLD,position,HOLD_position_manual_20260602_210833.csv,5.27,4.82,5.19,5.29,2,81.0,0602D3买入｜0603D3卖出均价5.190｜实现毛利-10.00｜含费净利-26.05,2026-06-02,0602D3,5.200,0,0,5205.05,closed
+001269,欧晶科技,光伏设备,HOLD,position,HOLD_position_manual_20260602_210833.csv,26.08,24.22,25.69,26.16,8,79.0,0602D3买入｜成本25.930｜数量200｜0603继续持有,2026-06-02,0602D3,25.930,200,0,5191.05,open

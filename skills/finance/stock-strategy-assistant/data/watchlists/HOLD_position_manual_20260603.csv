@@ -1,0 +1,5 @@
+code,name,industry,stage,pool_type,source_file,trigger_price,invalid_price,zone_low,zone_high,rank,score,note,entry_date,entry_stage,entry_price,quantity,sellable_quantity,cost_amount,position_status
+002421,达实智能,IT服务Ⅱ,HOLD,position,HOLD_position_manual_20260603.csv,4.97,4.11,4.90,4.98,2,106.0,0603D3买入｜成本4.970｜数量1100｜HOLD持仓,2026-06-03,0603D3,4.970,1100,0,5472.05,open
+600160,巨化股份,化学制品,HOLD,position,HOLD_position_manual_20260603.csv,,,,,,,0603D3买入｜均价38.917｜数量300｜分2笔｜D1池人工建仓,2026-06-03,0603D3,38.917,300,0,11685.10,open
+600596,新安股份,农化制品,HOLD,position,HOLD_position_manual_20260603.csv,13.09,12.08,12.89,13.13,7,93.0,0603D3买入｜成本13.540｜数量300｜HOLD持仓,2026-06-03,0603D3,13.540,300,0,4067.05,open
+000539,粤电力A,电力,HOLD,position,HOLD_position_manual_20260603.csv,,,,,,,0603D3买入｜成本8.530｜数量300｜D1池人工建仓,2026-06-03,0603D3,8.530,300,0,2564.05,open
