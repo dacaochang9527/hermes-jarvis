@@ -175,3 +175,31 @@ source_file = data/trades/tulong_trades.csv
 - 新确认的规则直接回写到本文件的对应 D1/D2/D3 条目，不保留“旧规则 + 新补充”的并列层。
 - 单日或少量样本形成的策略候选，先落到 `reports/reviews/tulong_d3_strategy_reviews/`，不要过早写入当前规则。
 - 旧 reference 若从历史版本中重新出现，与本文件冲突时，以本文件为准。
+
+## 规则变更同步协议
+
+当本文件的 D1/D2/D3、自动窄化、HOLD 或人工补票规则发生变化时，不能只改规则文档。每次规则变更必须同步评估并按需修改：
+
+```text
+references/tulong-current-rules.md   # 策略口径事实源
+src/stock_assistant/strategy_tulong.py # 可复用规则函数和字段计算
+scripts/tulong/selection/             # 候选生成、自动窄化、输出字段和报告文本
+scripts/tulong/runtime/               # active 池、HOLD 派生、提醒判断、展示文本
+references/tulong-operations.md       # 运行流程、字段来源、监控/排障说明
+tests/                                # 规则函数、selection CLI、runtime 和文档一致性测试
+```
+
+同步判断：
+
+- 改 D1/D2/D3 过滤或评分口径：优先检查 `src/stock_assistant/strategy_tulong.py` 和 `tests/test_tulong.py`；
+- 改观察池容量、自动窄化、输出字段或文件命名：检查 `scripts/tulong/selection/`、`tests/test_tulong_selection_cli.py` 和运行手册；
+- 改 HOLD、active 池、提醒触发或展示文案：检查 `scripts/tulong/runtime/`、`tests/test_preopen_rotate_watchlist.py` 和运行手册；
+- 改运行时字段来源或 cron 行为：检查 `references/tulong-operations.md`、`scripts/tulong/README.md` 和 wrapper 映射；
+- 如确认某层无需修改，复盘/提交说明中要明确写出“已评估，无需改动”的原因。
+
+推荐验证命令：
+
+```bash
+.venv/bin/python -m pytest -q
+.venv/bin/python -m py_compile scripts/tulong/runtime/*.py scripts/tulong/selection/*.py
+```
