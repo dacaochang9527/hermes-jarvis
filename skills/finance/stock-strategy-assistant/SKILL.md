@@ -57,7 +57,7 @@ metadata:
 references/tulong-current-rules.md
 ```
 
-当用户涉及脚本运行、D3 生成命令、实际监控池、preopen 切池/守门、cron、watchdog、日志、微信投递、限流或排障时，加载：
+当用户涉及脚本运行、D3 生成命令、实际监控池、preopen 切池/守门、cron、watchdog、日志、微信投递、限流、脚本目录、架构职责边界或 runtime/selection/src/reference 分工时，加载：
 
 ```text
 references/tulong-operations.md
@@ -69,6 +69,7 @@ references/tulong-operations.md
 - 新确认的屠龙规则写入 `references/tulong-current-rules.md`。
 - 新确认的运行流程、cron、切池、日志、提醒链路写入 `references/tulong-operations.md`。
 - `references/` 只保留未来会话应主动加载的当前事实源；当用户反馈 skill 太乱、reference 太散或职责模糊时，先压缩入口、合并到现有 class-level reference，删除旧底稿/一次性笔记，而不是继续新增平级 reference。
-- `scripts/tulong/README.md` 只维护脚本目录、入口和 wrapper 映射；运行流程、active 池来源、HOLD 派生、cron、watchdog、日志和排障纪律统一维护在 `references/tulong-operations.md`，不要两边重复保存同一事实。
+- `scripts/tulong/README.md` 只维护脚本目录、入口和 wrapper 映射；运行流程、active 池来源、HOLD 派生、cron、watchdog、日志、排障纪律、脚本目录和架构职责边界统一维护在 `references/tulong-operations.md`，不要两边重复保存同一事实。
+- 从 README 或其他局部文档移除跨层职责说明时，不要直接删除语义；先迁移到对应的 class-level reference（屠龙运行/架构职责默认进 `references/tulong-operations.md`），再在局部文档保留轻量索引或跳转。
 - 单日复盘、迁移记录、旧策略底稿和一次性问题笔记不要新增为平级 reference；阶段性结论优先放到 `reports/reviews/`，只在当前 reference 中保留必要索引。
 - 持仓事实源变更要同步三层：`references/tulong-current-rules.md`、`references/tulong-operations.md`、以及 `scripts/tulong/runtime/` 实际运行脚本和对应测试；不要只改文档。当前 HOLD 从 `data/trades/tulong_trades.csv` 的 buy/sell 流水派生 open position，不再维护独立 `HOLD_position_*` 源文件。

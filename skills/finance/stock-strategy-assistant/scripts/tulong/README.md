@@ -4,16 +4,12 @@
 
 这里只说明脚本目录和入口关系；运行事实、cron 调度、active watchlist、HOLD 派生、日志和排障统一看 `../../references/tulong-operations.md`。D1/D2/D3 策略规则统一看 `../../references/tulong-current-rules.md`。
 
-## 职责分工
+## 目录索引
 
 ```text
-references/               # 当前规则和运行手册
-src/stock_assistant/      # 可复用规则执行器
-scripts/tulong/selection/ # 选股、D3 观察池生成、自动窄化入口
-scripts/tulong/runtime/   # cron 调用的生产运行脚本
+selection/ # 选股、D3 观察池生成、自动窄化入口
+runtime/   # cron 调用的生产运行脚本
 ```
-
-`src/stock_assistant/strategy_tulong.py` 负责可复用规则函数；`scripts/tulong/` 负责流程编排、读写数据和被 cron 调度，不应成为长期规则事实源。
 
 ## runtime
 

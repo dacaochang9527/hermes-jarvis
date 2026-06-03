@@ -25,6 +25,14 @@ reports/reviews/          # 收盘复盘和策略验证结论
 src/stock_assistant/      # 可复用规则函数
 ```
 
+## 架构职责边界
+
+- `references/` 保存当前规则和运行手册，是未来会话应主动加载的事实源。
+- `src/stock_assistant/strategy_tulong.py` 保存可复用规则函数。
+- `scripts/tulong/selection/` 负责选股、D3 观察池生成和自动窄化入口。
+- `scripts/tulong/runtime/` 负责 cron 调用的生产运行脚本。
+- `scripts/tulong/` 只负责流程编排、读写数据和被 cron 调度，不应成为长期规则事实源。
+
 D1/D2/D3 规则函数应在 `src/stock_assistant/strategy_tulong.py`，selection 脚本只负责 CLI、数据读取和输出，不应成为唯一规则所有者。
 
 ## 文件命名与持仓来源
