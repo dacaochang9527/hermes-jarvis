@@ -38,12 +38,6 @@ def load_watchlist() -> list[dict[str, Any]]:
                 code = str(row.get('code', '')).zfill(6)
                 if not code:
                     continue
-                if row.get('pool_type') == 'position' and (row.get('position_status') or '').strip().lower() != 'open':
-                    append_log(
-                        f'[{datetime.now():%Y-%m-%d %H:%M:%S}] skip_closed_position '
-                        f'code={code} status={row.get("position_status") or "空"}'
-                    )
-                    continue
                 items.append({
                     'code': code,
                     'name': row.get('name') or code,
@@ -63,7 +57,6 @@ def load_watchlist() -> list[dict[str, Any]]:
                     'quantity': int(float(row['quantity'])) if row.get('quantity') else 0,
                     'sellable_quantity': int(float(row['sellable_quantity'])) if row.get('sellable_quantity') else 0,
                     'cost_amount': float(row['cost_amount']) if row.get('cost_amount') else None,
-                    'position_status': row.get('position_status') or '',
                 })
     except Exception as e:
         append_log(f'[{datetime.now():%Y-%m-%d %H:%M:%S}] watchlist_load_error {type(e).__name__}: {e}')

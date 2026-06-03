@@ -11,6 +11,7 @@ from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parents[3]
 WATCHLIST_DIR = PROJECT / 'data/watchlists'
+TRADES_PATH = PROJECT / 'data/trades/tulong_trades.csv'
 ACTIVE_WATCHLIST = WATCHLIST_DIR / 'tulong_active_watchlist.csv'
 LEGACY_ACTIVE_D3 = WATCHLIST_DIR / 'tulong_d3.csv'
 STATE_PATH = WATCHLIST_DIR / 'tulong_d3_monitor_state.json'
@@ -24,7 +25,7 @@ ACTIVE_FIELDNAMES = [
     'trigger_price', 'invalid_price', 'zone_low', 'zone_high',
     'rank', 'score', 'note',
     'entry_date', 'entry_stage', 'entry_price', 'quantity',
-    'sellable_quantity', 'cost_amount', 'position_status',
+    'sellable_quantity', 'cost_amount',
 ]
 VALID_POOL_TYPES = {'watch', 'position'}
 
@@ -75,11 +76,10 @@ def find_latest_source(now: datetime, stage: str, pool_type: str) -> Path | None
 
 def find_sources(now: datetime) -> list[Path]:
     sources: list[Path] = []
-    # watch 走当日 MMDDD3；position 走最新 HOLD 快照（无日期前缀，跨日滚动续期）
-    for stage, pool_type in (('D3', 'watch'), ('HOLD', 'position')):
-        path = find_latest_source(now, stage, pool_type)
-        if path:
-            sources.append(path)
+    # watch 走当日 MMDDD3；HOLD 持仓从 data/trades/tulong_trades.csv 派生。
+    path = find_latest_source(now, 'D3', 'watch')
+    if path:
+        sources.append(path)
     return sources
 
 
@@ -119,11 +119,6 @@ def normalize_source_rows(src: Path) -> tuple[list[dict[str, str]], list[str]]:
                 raise RuntimeError(f'position rows must use stage=HOLD: code={code} stage={stage} source={src.name}')
             if str(stage) == 'HOLD' and pool_type != 'position':
                 raise RuntimeError(f'HOLD only accepts position rows: code={code} pool_type={pool_type} source={src.name}')
-            if pool_type == 'position':
-                position_status = (row.get('position_status') or '').strip().lower()
-                if position_status != 'open':
-                    filtered.append(f'{code} {row.get("name", "")} position_status={position_status or "空"}'.strip())
-                    continue
             if pool_type == 'watch' and not str(stage).endswith('D3'):
                 raise RuntimeError(f'watch rows must use MMDDD3 stage: code={code} stage={stage} source={src.name}')
             out = {name: row.get(name, '') for name in ACTIVE_FIELDNAMES}
@@ -147,12 +142,96 @@ def normalize_source_rows(src: Path) -> tuple[list[dict[str, str]], list[str]]:
                 'quantity': row.get('quantity', ''),
                 'sellable_quantity': row.get('sellable_quantity', ''),
                 'cost_amount': row.get('cost_amount', ''),
-                'position_status': row.get('position_status', ''),
             })
             if not out['note']:
                 out['note'] = f'{stage}｜{pool_type}｜source:{src.name}'
             rows.append(out)
     return rows, filtered
+
+
+def fmt_price(value: float) -> str:
+    return f'{value:.3f}'
+
+
+def derive_open_positions_from_trades(now: datetime) -> list[dict[str, str]]:
+    if not TRADES_PATH.exists():
+        return []
+    lots_by_code: dict[str, list[dict[str, object]]] = {}
+    with TRADES_PATH.open(newline='', encoding='utf-8-sig') as f:
+        for row in csv.DictReader(f):
+            code = str(row.get('code', '')).zfill(6)
+            if not code or code == '000000':
+                continue
+            action = (row.get('action') or '').strip().lower()
+            try:
+                quantity = int(float(row.get('quantity') or 0))
+                price = float(row.get('price') or 0)
+                fee = float(row.get('fee') or 0)
+            except ValueError:
+                continue
+            if quantity <= 0:
+                continue
+            lots = lots_by_code.setdefault(code, [])
+            if action == 'buy':
+                lots.append({
+                    'quantity': quantity,
+                    'price': price,
+                    'fee_per_share': fee / quantity if quantity else 0.0,
+                    'trade_date': row.get('trade_date') or '',
+                    'entry_stage': row.get('position_ref') or row.get('session_label') or '',
+                    'name': row.get('name') or code,
+                })
+            elif action == 'sell':
+                remaining = quantity
+                while remaining > 0 and lots:
+                    lot = lots[0]
+                    lot_qty = int(str(lot['quantity']))
+                    used = min(lot_qty, remaining)
+                    lot['quantity'] = lot_qty - used
+                    remaining -= used
+                    if int(str(lot['quantity'])) <= 0:
+                        lots.pop(0)
+
+    rows: list[dict[str, str]] = []
+    for code, lots in sorted(lots_by_code.items()):
+        open_lots = [lot for lot in lots if int(str(lot['quantity'])) > 0]
+        if not open_lots or not is_main_board(code):
+            continue
+        quantity = sum(int(str(lot['quantity'])) for lot in open_lots)
+        weighted_cost = sum(int(str(lot['quantity'])) * float(str(lot['price'])) for lot in open_lots)
+        fee_cost = sum(int(str(lot['quantity'])) * float(str(lot.get('fee_per_share') or 0.0)) for lot in open_lots)
+        entry_price = weighted_cost / quantity
+        entry_dates = [str(lot.get('trade_date') or '') for lot in open_lots if lot.get('trade_date')]
+        entry_date = min(entry_dates) if entry_dates else ''
+        entry_stages: list[str] = []
+        for lot in open_lots:
+            stage = str(lot.get('entry_stage') or '')
+            if stage and stage not in entry_stages:
+                entry_stages.append(stage)
+        name = str(open_lots[-1].get('name') or code)
+        sellable_quantity = quantity if entry_date and entry_date < now.strftime('%Y-%m-%d') else 0
+        rows.append({
+            'code': code,
+            'name': name,
+            'industry': '',
+            'stage': 'HOLD',
+            'pool_type': 'position',
+            'source_file': str(TRADES_PATH.relative_to(PROJECT)),
+            'trigger_price': fmt_price(entry_price),
+            'invalid_price': fmt_price(entry_price * 0.92),
+            'zone_low': fmt_price(entry_price * 0.985),
+            'zone_high': fmt_price(entry_price * 1.003),
+            'rank': '',
+            'score': '',
+            'note': f'HOLD｜from_trades｜entry_stage={"/".join(entry_stages) or "unknown"}｜quantity={quantity}｜entry_price={entry_price:.3f}',
+            'entry_date': entry_date,
+            'entry_stage': '/'.join(entry_stages),
+            'entry_price': fmt_price(entry_price),
+            'quantity': str(quantity),
+            'sellable_quantity': str(sellable_quantity),
+            'cost_amount': f'{weighted_cost + fee_cost:.2f}',
+        })
+    return rows
 
 
 def write_active_watchlist(sources: list[Path], now: datetime) -> tuple[int, list[str], list[str], list[str], list[str]]:
@@ -164,8 +243,26 @@ def write_active_watchlist(sources: list[Path], now: datetime) -> tuple[int, lis
         rows.extend(src_rows)
         filtered.extend(src_filtered)
         source_names.append(src.name)
+    trade_position_rows = derive_open_positions_from_trades(now)
+    if trade_position_rows:
+        metadata_by_code = {row.get('code', ''): row for row in rows}
+        position_codes = {row['code'] for row in trade_position_rows}
+        deduped_rows = []
+        for row in rows:
+            if row.get('code') in position_codes and row.get('pool_type') == 'watch':
+                filtered.append(f'{row.get("code")} {row.get("name", "")} duplicated_as_HOLD_from_trades'.strip())
+                continue
+            deduped_rows.append(row)
+        rows = deduped_rows
+        for position in trade_position_rows:
+            source = metadata_by_code.get(position['code'], {})
+            for key in ('industry', 'trigger_price', 'invalid_price', 'zone_low', 'zone_high', 'rank', 'score'):
+                if source.get(key):
+                    position[key] = source[key]
+            rows.append(position)
+        source_names.append(str(TRADES_PATH.relative_to(PROJECT)))
     if not rows:
-        raise RuntimeError('no rows after merging timestamped D3 watch / HOLD position sources')
+        raise RuntimeError('no rows after merging timestamped D3 watch source and trade-derived HOLD positions')
 
     if ACTIVE_WATCHLIST.exists():
         backup = ACTIVE_WATCHLIST.with_name(f'{ACTIVE_WATCHLIST.stem}.backup_{now:%Y%m%d_%H%M%S}{ACTIVE_WATCHLIST.suffix}')
@@ -232,7 +329,7 @@ def validate_active_watchlist(now: datetime) -> dict[str, object]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description='Rotate active Tulong D3 watchlist and HOLD positions before market open.')
+    parser = argparse.ArgumentParser(description='Rotate active Tulong D3 watchlist and trade-derived HOLD positions before market open.')
     parser.add_argument('--date', help='Override watch date, format YYYY-MM-DD. Useful for dry-run verification.')
     parser.add_argument('--force', action='store_true', help='Rotate even if state already matches today.')
     return parser.parse_args()
@@ -251,7 +348,7 @@ def main() -> int:
 
     sources = find_sources(now)
     if not sources:
-        msg = f'【A股监控】开盘前切池失败\n未找到今日 {now:%m%d}D3 watch 或 HOLD position 的 *_YYYYMMDD_HHMMSS.csv；当前监控池未更新。'
+        msg = f'【A股监控】开盘前切池失败\n未找到今日 {now:%m%d}D3 watch 的 *_YYYYMMDD_HHMMSS.csv；当前监控池未更新。'
         append_log(f'[{now:%Y-%m-%d %H:%M:%S}] preopen_rotate missing_timestamped_sources date={now:%Y-%m-%d}')
         print(msg)
         return 0

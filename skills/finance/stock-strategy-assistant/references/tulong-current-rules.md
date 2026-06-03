@@ -97,7 +97,7 @@ D3 当天统一称为 `D3观察区`，不是“低吸池”。D3 观察区的主
 
 复核清单：
 
-- 先查重：读取已确认/已落盘的 `HOLD_position_*_YYYYMMDD_HHMMSS.csv`，同一只票默认保留在 HOLD，不重复放入 D3，除非用户明确要求双标签；
+- 先查重：读取 `data/trades/tulong_trades.csv` 并按成交记录汇总当前 open position；同一只票默认保留在 HOLD，不重复放入 D3，除非用户明确要求双标签；
 - 点位有效：检查 `zone_low <= zone_high`，观察区不能过度贴近失效线；安全垫过薄或观察区倒挂时剔除/降为备选；
 - AND 口径：必须同时具备低吸可执行性和强势潜质；
 - D2 形态：优先收盘近十字/分歧平衡、量比健康、回落充分但未破位；
@@ -124,19 +124,38 @@ D3 当天统一称为 `D3观察区`，不是“低吸池”。D3 观察区的主
 
 ## HOLD 持仓事实层
 
-买入后统一进入 `HOLD`，工程字段建议：
+买入后统一进入 `HOLD`。HOLD 不再依赖独立 `HOLD_position_*` 文件，当前持仓从 `data/trades/tulong_trades.csv` 的买卖记录汇总派生：同一代码买入数量减卖出数量后仍大于 0，即视为 open position。
+
+交易记录字段至少包括：
+
+```text
+trade_date
+session_label
+action            # buy / sell
+code
+name
+quantity
+price
+amount
+fee
+net_amount
+position_ref      # 原始 D3 入场标签，如 0603D3
+note
+d3_watch
+```
+
+运行时派生出的 HOLD 字段建议：
 
 ```text
 stage = HOLD
 pool_type = position
-entry_date
-entry_stage
-entry_price
-quantity
-sellable_quantity
+entry_date        # 从首笔未平买入 trade_date 派生
+entry_stage       # 从 position_ref 派生
+entry_price       # 按剩余持仓成本或加权买入成本派生
+quantity          # 当前剩余持仓数量
+sellable_quantity # T+1 可卖性由 entry_date / trade_date 派生
 cost_amount
-position_status  # open / reduced / closed
-source_file
+source_file = data/trades/tulong_trades.csv
 ```
 
 验证期内只呈现事实指标：成本、现价、相对盈亏、距失效位、可卖数量、当日强弱。不要给“该卖/该加/止损止盈”的硬结论。

@@ -19,7 +19,7 @@ MAIN_BOARD_PREFIXES = ('600', '601', '603', '605', '000', '001', '002', '003')
 FILTER_PREFIXES = ('300', '301', '688', '689', '8', '4', '9')
 VALID_POOL_TYPES = {'watch', 'position'}
 REQUIRED_COMMON = ('industry', 'stage', 'pool_type', 'source_file', 'trigger_price', 'invalid_price', 'zone_low', 'zone_high')
-REQUIRED_POSITION = ('entry_date', 'entry_stage', 'entry_price', 'quantity', 'sellable_quantity', 'position_status')
+REQUIRED_POSITION = ('entry_date', 'entry_stage', 'entry_price', 'quantity', 'sellable_quantity')
 
 
 def append_log(message: str) -> None:
@@ -104,8 +104,6 @@ def validate(now: datetime) -> tuple[list[str], dict[str, Any]]:
             errors.append(f'{code} 持仓行stage应为HOLD，当前={stage}')
         if stage == 'HOLD' and pool_type != 'position':
             errors.append(f'{code} HOLD只允许持仓position，当前pool_type={pool_type}')
-        if pool_type == 'position' and row.get('position_status', '').strip().lower() != 'open':
-            errors.append(f'{code} 已清仓HOLD不应进入监控池：position_status={row.get("position_status", "") or "空"}')
 
     if bad_prefix:
         errors.append('实际监控池混入非沪深主板/20cm标的：' + '、'.join(bad_prefix))

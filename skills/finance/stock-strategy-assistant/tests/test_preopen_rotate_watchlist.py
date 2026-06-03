@@ -48,41 +48,83 @@ def test_find_latest_source_uses_full_timestamp(monkeypatch, tmp_path):
     assert found == new
 
 
-def test_find_sources_uses_hold_position_sources(monkeypatch, tmp_path):
+def test_find_sources_uses_only_today_d3_watch(monkeypatch, tmp_path):
     mod = load_module()
     monkeypatch.setattr(mod, "WATCHLIST_DIR", tmp_path)
     active = tmp_path / "tulong_active_watchlist.csv"
     monkeypatch.setattr(mod, "ACTIVE_WATCHLIST", active)
 
     d3_watch = tmp_path / "0529D3_watch_scan_20260529_214437.csv"
-    hold_watch = tmp_path / "HOLD_watch_manual_review_20260529_214437.csv"
     hold_position = tmp_path / "HOLD_position_rollover_20260529_214437.csv"
-    for path in (d3_watch, hold_watch, hold_position, active):
+    for path in (d3_watch, hold_position, active):
         path.write_text("code,name\n", encoding="utf-8")
 
     sources = mod.find_sources(datetime(2026, 5, 29, 8, 50))
-    assert d3_watch in sources
-    assert hold_position in sources
-    assert hold_watch not in sources
+    assert sources == [d3_watch]
 
 
-def test_find_sources_uses_latest_hold_position_regardless_of_date(monkeypatch, tmp_path):
+def test_derive_open_positions_from_trades_uses_fifo_and_excludes_closed(monkeypatch, tmp_path):
     mod = load_module()
-    monkeypatch.setattr(mod, "WATCHLIST_DIR", tmp_path)
+    trades = tmp_path / "tulong_trades.csv"
+    monkeypatch.setattr(mod, "TRADES_PATH", trades)
+    monkeypatch.setattr(mod, "PROJECT", tmp_path)
+    trades.write_text(
+        "trade_date,session_label,action,code,name,quantity,price,amount,fee,net_amount,position_ref,note,d3_watch\n"
+        "2026-06-02,0602D3,buy,600001,测试A,100,10.000,1000,5,-1005,0602D3,,yes\n"
+        "2026-06-03,0603D3,sell,600001,测试A,40,11.000,440,5,435,0602D3,,yes\n"
+        "2026-06-03,0603D3,buy,002001,测试B,200,5.000,1000,5,-1005,0603D3,,yes\n"
+        "2026-06-03,0603D3,buy,600002,测试C,100,8.000,800,5,-805,0603D3,,yes\n"
+        "2026-06-03,0603D3,sell,600002,测试C,100,8.500,850,5,845,0603D3,,yes\n",
+        encoding="utf-8",
+    )
+
+    rows = mod.derive_open_positions_from_trades(datetime(2026, 6, 3, 8, 50))
+    by_code = {row["code"]: row for row in rows}
+
+    assert set(by_code) == {"600001", "002001"}
+    assert by_code["600001"]["quantity"] == "60"
+    assert by_code["600001"]["sellable_quantity"] == "60"
+    assert by_code["600001"]["entry_stage"] == "0602D3"
+    assert by_code["002001"]["quantity"] == "200"
+    assert by_code["002001"]["sellable_quantity"] == "0"
+    assert by_code["002001"]["source_file"] == "tulong_trades.csv"
+
+
+def test_write_active_watchlist_appends_trade_derived_hold(monkeypatch, tmp_path):
+    mod = load_module()
     active = tmp_path / "tulong_active_watchlist.csv"
+    state = tmp_path / "state.json"
+    trades = tmp_path / "tulong_trades.csv"
     monkeypatch.setattr(mod, "ACTIVE_WATCHLIST", active)
+    monkeypatch.setattr(mod, "LEGACY_ACTIVE_D3", tmp_path / "tulong_d3.csv")
+    monkeypatch.setattr(mod, "TRADES_PATH", trades)
+    monkeypatch.setattr(mod, "PROJECT", tmp_path)
+    monkeypatch.setattr(mod, "STATE_PATH", state)
 
-    d3_watch = tmp_path / "0531D3_watch_scan_20260531_085000.csv"
-    old_hold = tmp_path / "HOLD_position_rollover_20260528_214902.csv"
-    new_hold = tmp_path / "HOLD_position_rollover_20260530_171700.csv"
-    for path in (d3_watch, old_hold, new_hold, active):
-        path.write_text("code,name\n", encoding="utf-8")
+    source = tmp_path / "0603D3_watch_scan_20260603_080000.csv"
+    source.write_text(
+        "code,name,industry,stage,pool_type,trigger_price,invalid_price,zone_low,zone_high\n"
+        "600000,浦发银行,银行,0603D3,watch,10,9,9.8,10.1\n",
+        encoding="utf-8",
+    )
+    trades.write_text(
+        "trade_date,session_label,action,code,name,quantity,price,amount,fee,net_amount,position_ref,note,d3_watch\n"
+        "2026-06-02,0602D3,buy,000001,平安银行,100,12.000,1200,5,-1205,0602D3,,yes\n",
+        encoding="utf-8",
+    )
 
-    # 切池在 0531；HOLD 持仓取最新快照(0530)，与当日日期前缀无关
-    sources = mod.find_sources(datetime(2026, 5, 31, 8, 50))
-    assert d3_watch in sources
-    assert new_hold in sources
-    assert old_hold not in sources
+    count, filtered, source_names, stages, pool_types = mod.write_active_watchlist([source], datetime(2026, 6, 3, 8, 50))
+
+    assert count == 2
+    assert filtered == []
+    assert source_names == [source.name, "tulong_trades.csv"]
+    assert stages == ["0603D3", "HOLD"]
+    assert pool_types == ["position", "watch"]
+    content = active.read_text(encoding="utf-8")
+    assert "600000" in content
+    assert "000001" in content
+    assert "HOLD" in content
+    assert "position_status" not in content.splitlines()[0]
 
 
 def test_normalize_source_rows_rejects_hold_watch_rows(monkeypatch, tmp_path):
@@ -118,5 +160,4 @@ def test_active_state_matches_exempts_hold_positions(monkeypatch, tmp_path):
         encoding="utf-8",
     )
 
-    # watch 行带当日前缀、HOLD 持仓行无日期应被豁免 -> 视为已切池
     assert mod.active_state_matches(datetime(2026, 5, 31, 8, 50)) is True

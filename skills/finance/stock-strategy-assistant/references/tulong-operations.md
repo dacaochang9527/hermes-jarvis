@@ -18,7 +18,8 @@ cd /Users/fenomenoronaldo/.hermes/skills/finance/stock-strategy-assistant
 ```text
 scripts/tulong/runtime/    # cron 正在调用的运行脚本
 scripts/tulong/selection/  # D1/D2/D3 生成和自动窄化入口
-data/watchlists/          # D3 watch、HOLD position、active watchlist
+data/watchlists/          # D3 watch、active watchlist
+data/trades/              # 买卖记录，用于派生 HOLD 当前持仓
 reports/alerts/           # 盘中 JSONL/CSV/log
 reports/reviews/          # 收盘复盘和策略验证结论
 src/stock_assistant/      # 可复用规则函数
@@ -26,7 +27,7 @@ src/stock_assistant/      # 可复用规则函数
 
 D1/D2/D3 规则函数应在 `src/stock_assistant/strategy_tulong.py`，selection 脚本只负责 CLI、数据读取和输出，不应成为唯一规则所有者。
 
-## 文件命名
+## 文件命名与持仓来源
 
 源文件必须带完整 `YYYYMMDD_HHMMSS` 时间戳：
 
@@ -34,10 +35,9 @@ D1/D2/D3 规则函数应在 `src/stock_assistant/strategy_tulong.py`，selection
 MMDDD3_D1_filtered_YYYYMMDD_HHMMSS.csv
 MMDDD3_watch_scan_YYYYMMDD_HHMMSS.csv
 MMDDD3_watch_manual_review_YYYYMMDD_HHMMSS.csv
-HOLD_position_<reason>_YYYYMMDD_HHMMSS.csv
 ```
 
-不要再生成或依赖只有 `HHMMSS` 的旧文件名。watch 源按当日 `MMDDD3_watch_*` 最新文件选取；HOLD 源按全局最新 `HOLD_position_*` 选取，并只合并 `position_status=open`。
+不要再生成或依赖只有 `HHMMSS` 的旧文件名。watch 源按当日 `MMDDD3_watch_*` 最新文件选取；HOLD 当前持仓不再使用独立源文件，统一从 `data/trades/tulong_trades.csv` 汇总买卖记录派生。
 
 ## 开盘前流程
 
@@ -53,7 +53,7 @@ HOLD_position_<reason>_YYYYMMDD_HHMMSS.csv
 `preopen_rotate_watchlist.py` 要做：
 
 - 查找今日最新 `MMDDD3_watch_*_YYYYMMDD_HHMMSS.csv`；
-- 查找全局最新 `HOLD_position_*_YYYYMMDD_HHMMSS.csv`，只保留 `position_status=open`；
+- 读取 `data/trades/tulong_trades.csv`，按代码汇总买入/卖出数量，派生当前 open HOLD；
 - 合并写入 `data/watchlists/tulong_active_watchlist.csv`；
 - 保留 `industry`、`trigger_price`、`invalid_price`、`zone_low`、`zone_high`、`rank`、`score`、`note`；
 - 过滤 20cm / 非沪深主板；
@@ -86,8 +86,8 @@ HOLD_position_<reason>_YYYYMMDD_HHMMSS.csv
 当用户问“今天监控池有哪些 / 是否正常 / 先忽略 HOLD”时，必须区分 D3 watch 与 HOLD position：
 
 - 只问 D3 且用户明确“先忽略 HOLD”时，只读最新 `MMDDD3_watch_*_YYYYMMDD_HHMMSS.csv` 与 active 中 `stage=MMDDD3,pool_type=watch` 的行；
-- 只有存在当前有效的 `HOLD_position_*` 且 `position_status=open` 时，才把 HOLD 算作当前应监控持仓；
-- `position_status=closed` 不进入当前监控池；如 active 混入 closed HOLD，要标为污染项并清理；
+- HOLD 是否进入当前监控池，以 `data/trades/tulong_trades.csv` 汇总后的剩余持仓为准；
+- 已经买卖相抵、剩余数量为 0 的代码不进入当前监控池；如 active 混入已清仓 HOLD，要标为污染项并清理；
 - 回答“正常”前至少核对 cron 启用且最近 ok、active CSV 是今日 MMDDD3、state 与 active 一致。
 
 ## 排障顺序
@@ -111,4 +111,4 @@ HOLD_position_<reason>_YYYYMMDD_HHMMSS.csv
 FORCE_RUN=1 ~/.hermes/scripts/tulong_watchdog.sh
 ```
 
-涉及 cron、脚本目录、selection CLI、active watchlist 来源或 D3/HOLD 流程时，必须同步更新 `scripts/tulong/README.md` 和本文件。
+修改运行流程、active watchlist 来源、cron 行为、HOLD 派生、日志或排障纪律时，更新本文件；修改脚本入口、目录结构或 wrapper 映射时，更新 `scripts/tulong/README.md`。不要在 README 和本文件重复维护同一套运行事实。
