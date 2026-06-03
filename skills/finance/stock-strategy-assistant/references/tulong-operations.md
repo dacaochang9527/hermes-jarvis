@@ -42,10 +42,9 @@ D1/D2/D3 规则函数应在 `src/stock_assistant/strategy_tulong.py`，selection
 ```text
 MMDDD3_D1_filtered_YYYYMMDD_HHMMSS.csv
 MMDDD3_watch_scan_YYYYMMDD_HHMMSS.csv
-MMDDD3_watch_manual_review_YYYYMMDD_HHMMSS.csv
 ```
 
-不要再生成或依赖只有 `HHMMSS` 的旧文件名。watch 源按当日 `MMDDD3_watch_*` 最新文件选取；HOLD 当前持仓不再使用独立源文件，统一从 `data/trades/tulong_trades.csv` 汇总买卖记录派生。
+不要再生成或依赖只有 `HHMMSS` 的旧文件名。watch 源按当日最新 `MMDDD3_watch_scan_YYYYMMDD_HHMMSS.csv` 选取。HOLD 当前持仓不再使用独立源文件，统一从 `data/trades/tulong_trades.csv` 汇总买卖记录派生。
 
 ## 开盘前流程
 

@@ -47,6 +47,32 @@ def test_rule_change_sync_protocol_is_documented():
     assert "scripts/tulong/runtime/" in skill
 
 
+def test_manual_narrowing_and_ticket_add_are_not_current_flow():
+    current_files = [
+        "SKILL.md",
+        "references/tulong-current-rules.md",
+        "references/tulong-operations.md",
+        "scripts/tulong/README.md",
+        "scripts/tulong/selection/generate_d3_candidates.py",
+    ]
+    forbidden = [
+        "人工补票",
+        "人工修正",
+        "人工复核",
+        "manual_add",
+        "manual_review",
+    ]
+
+    for rel_path in current_files:
+        text = read_text(rel_path)
+        for term in forbidden:
+            assert term not in text, f"{term} should not appear in {rel_path}"
+
+    rules = read_text("references/tulong-current-rules.md")
+    assert "规则输入修订" in rules
+    assert "重新运行自动规则生成观察池" in rules
+
+
 def test_documented_architecture_paths_exist():
     for rel_path in [
         "references/tulong-operations.md",

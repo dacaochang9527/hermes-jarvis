@@ -51,7 +51,7 @@ metadata:
 
 ## 屠龙专题路由
 
-当用户讨论“屠龙战术”、D1/D2/D3、D3观察区、HOLD 持仓、日期+D几、人工补票、买点/失效位/参与区时，加载：
+当用户讨论“屠龙战术”、D1/D2/D3、D3观察区、HOLD 持仓、日期+D几、买点/失效位/参与区、规则输入修订时，加载：
 
 ```text
 references/tulong-current-rules.md
@@ -67,6 +67,7 @@ references/tulong-operations.md
 
 - `SKILL.md` 只保留入口、边界和路由，不写屠龙细则。
 - 新确认的屠龙规则写入 `references/tulong-current-rules.md`，并按其中“规则变更同步协议”评估 `src/stock_assistant/`、`scripts/tulong/selection/`、`scripts/tulong/runtime/`、`references/tulong-operations.md` 和测试是否需要同步修改。
+- 当用户要求取消、替换或改名某个策略环节（例如窄化、校正、补票、HOLD 口径、提醒方式）时，按规则变更处理：同步当前规则、运行手册、脚本生成文案和守门测试；历史 `reports/` 只作为过去产物，除非用户明确要求，不批量回改。
 - 新确认的运行流程、cron、切池、日志、提醒链路写入 `references/tulong-operations.md`。
 - `references/` 只保留未来会话应主动加载的当前事实源；当用户反馈 skill 太乱、reference 太散或职责模糊时，先压缩入口、合并到现有 class-level reference，删除旧底稿/一次性笔记，而不是继续新增平级 reference。
 - `scripts/tulong/README.md` 只维护脚本目录、入口和 wrapper 映射；运行流程、active 池来源、HOLD 派生、cron、watchdog、日志、排障纪律、脚本目录和架构职责边界统一维护在 `references/tulong-operations.md`，不要两边重复保存同一事实。

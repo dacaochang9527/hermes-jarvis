@@ -130,7 +130,7 @@ def test_write_active_watchlist_appends_trade_derived_hold(monkeypatch, tmp_path
 def test_normalize_source_rows_rejects_hold_watch_rows(monkeypatch, tmp_path):
     mod = load_module()
     monkeypatch.setattr(mod, "WATCHLIST_DIR", tmp_path)
-    source = tmp_path / "HOLD_watch_manual_review_20260529_214437.csv"
+    source = tmp_path / "0603D3_watch_scan_20260603_085000.csv"
     source.write_text(
         "code,name,stage,pool_type,trigger_price,invalid_price,zone_low,zone_high\n"
         "600000,浦发银行,HOLD,watch,10,9,9.8,10.1\n",
