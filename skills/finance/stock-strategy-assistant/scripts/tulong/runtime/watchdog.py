@@ -44,6 +44,7 @@ def load_watchlist() -> list[dict[str, Any]]:
                     'industry': row.get('industry') or '',
                     'stage': row.get('stage') or '',
                     'pool_type': row.get('pool_type') or '',
+                    'pool_subtype': row.get('pool_subtype') or '',
                     'source_file': row.get('source_file') or '',
                     'trigger_price': float(row['trigger_price']),
                     'invalid_price': float(row['invalid_price']),
@@ -153,6 +154,7 @@ def validate_watchlist_date(now: datetime, watchlist: list[dict[str, Any]]) -> b
 def load_state() -> dict[str, Any]:
     default_state = {
         'last_prices': {},
+        'alert_statuses': {},
         'pending_snapshot': None,
         'pending_alerts': [],
         'last_event_run_at': None,
@@ -168,6 +170,8 @@ def load_state() -> dict[str, Any]:
                 state.setdefault(key, value.copy() if isinstance(value, dict | list) else value)
             if not isinstance(state.get('pending_alerts'), list):
                 state['pending_alerts'] = []
+            if not isinstance(state.get('alert_statuses'), dict):
+                state['alert_statuses'] = {}
             return state
     except Exception:
         pass
@@ -303,6 +307,11 @@ def status_label(event: str) -> str:
         'near_invalid': '接近止损',
         'invalid': '跌破止损',
         'sharp_down': '快速走弱',
+        'hold_invalid': 'HOLD跌破止损',
+        'hold_near_invalid': 'HOLD接近止损',
+        'hold_cost_loss': 'HOLD跌破成本',
+        'hold_recover_cost': 'HOLD回收成本',
+        'hold_profit_take': 'HOLD浮盈观察',
     }.get(event, '观察')
 
 
@@ -315,15 +324,66 @@ def format_hhmm(ts: str) -> str:
 
 EVENT_PRIORITY = {
     'invalid': 0,
+    'hold_invalid': 0,
     'near_invalid': 1,
-    'sharp_down': 2,
-    'entry_zone': 3,
-    'recover_trigger': 4,
-    'strong_up': 5,
-    'intraday_fade': 6,
-    'underwater_cross': 7,
-    'underwater': 8,
+    'hold_near_invalid': 1,
+    'hold_recover_cost': 2,
+    'hold_cost_loss': 3,
+    'entry_zone': 4,
+    'recover_trigger': 5,
+    'hold_profit_take': 6,
+    'sharp_down': 7,
+    'strong_up': 8,
+    'intraday_fade': 9,
+    'underwater_cross': 10,
+    'underwater': 11,
 }
+
+EVENT_TIERS = {
+    'invalid': 'A',
+    'hold_invalid': 'A',
+    'near_invalid': 'A',
+    'hold_near_invalid': 'A',
+    'hold_recover_cost': 'A',
+    'entry_zone': 'A',
+    'recover_trigger': 'A',
+    'hold_cost_loss': 'B',
+    'hold_profit_take': 'B',
+    'underwater_cross': 'B',
+    'intraday_fade': 'B',
+    'strong_up': 'B',
+    'sharp_down': 'B',
+    'underwater': 'C',
+    'observe': 'C',
+}
+
+PUSHABLE_TIERS = {'A', 'B'}
+
+
+def alert_tier(event: str) -> str:
+    return EVENT_TIERS.get(event, 'C')
+
+
+def alert_status(event: str) -> str:
+    return {
+        'underwater_cross': 'underwater',
+        'hold_near_invalid': 'near_invalid',
+        'hold_invalid': 'invalid',
+        'hold_cost_loss': 'cost_loss',
+        'hold_recover_cost': 'recover_cost',
+        'hold_profit_take': 'profit_take',
+    }.get(event, event)
+
+
+def should_push_alert(event: str, previous_status: str | None, current_status: str) -> bool:
+    tier = alert_tier(event)
+    if tier not in PUSHABLE_TIERS:
+        return False
+    if previous_status == current_status:
+        return False
+    if previous_status is None and event == 'underwater':
+        return False
+    return True
 
 
 def build_action(event: str, trigger: float, invalid: float) -> str:
@@ -335,6 +395,14 @@ def build_action(event: str, trigger: float, invalid: float) -> str:
         return '强势不追；等回踩买点区或尾盘确认'
     if event in {'near_invalid', 'invalid', 'sharp_down'}:
         return f'先放弃买点；跌破{invalid:.2f}移出观察池'
+    if event in {'hold_invalid', 'hold_near_invalid'}:
+        return f'HOLD风控优先；跌破/贴近{invalid:.2f}按持仓纪律处理'
+    if event == 'hold_cost_loss':
+        return f'HOLD跌破成本观察线{trigger:.2f}；若不能快速收回，优先控风险'
+    if event == 'hold_recover_cost':
+        return f'HOLD回收成本观察线{trigger:.2f}；看能否站稳，弱则不恋战'
+    if event == 'hold_profit_take':
+        return 'HOLD浮盈拉开；观察减仓/T机会，不追高加仓'
     if event == 'intraday_fade':
         return f'冲高回落先降权；只看能否回收{trigger:.2f}'
     return f'继续观察{trigger:.2f}附近承接；跌破{invalid:.2f}放弃'
@@ -344,6 +412,7 @@ def build_alerts(now: datetime, quotes: dict[str, dict[str, Any]], state: dict[s
     watchlist = watchlist or WATCHLIST
     alerts: list[dict[str, Any]] = []
     last_prices: dict[str, float] = state.setdefault('last_prices', {})
+    alert_statuses: dict[str, str] = state.setdefault('alert_statuses', {})
 
     for item in watchlist:
         code = item['code']
@@ -364,34 +433,62 @@ def build_alerts(now: datetime, quotes: dict[str, dict[str, Any]], state: dict[s
         pct_from_trigger = price / trigger - 1
         pct_from_invalid = price / invalid - 1
         last = float(last_prices.get(code, 0) or 0)
+        previous_status = alert_statuses.get(code)
         crossed_under_trigger = last > 0 and last >= trigger and price < trigger
         crossed_over_trigger = last > 0 and last < trigger and price >= trigger
         in_entry_zone = zone_low <= price <= zone_high
         last_prices[code] = price
 
         candidates: list[tuple[str, str, str]] = []
-        if price <= invalid:
-            candidates.append(('invalid', '策略失效/风险', f'当前价 {price:.2f} 已跌破失效位 {invalid:.2f}'))
-        elif pct_from_invalid <= 0.015:
-            candidates.append(('near_invalid', '接近失效位', f'当前价 {price:.2f} 距失效位 {invalid:.2f} 约 {pct_from_invalid*100:.1f}%'))
-        if in_entry_zone and pct_from_invalid > 0.015:
-            candidates.append(('entry_zone', '观察买入时机', f'当前价 {price:.2f} 处于低吸观察区 {zone_low:.2f}–{zone_high:.2f}'))
-        if price < trigger and pct_from_invalid > 0.015:
-            event = 'underwater_cross' if crossed_under_trigger else 'underwater'
-            candidates.append((event, 'D3水下观察', f'当前价 {price:.2f} 低于观察价 {trigger:.2f}（{pct_from_trigger*100:.1f}%）'))
-        if crossed_over_trigger and q['pct'] > 0:
-            candidates.append(('recover_trigger', '水下回收观察价', f'从观察价下方回到 {trigger:.2f} 上方，当前 {price:.2f}'))
-        if q['pct'] >= 5 and price > trigger:
-            candidates.append(('strong_up', '强势拉升', f'当前涨幅 {q["pct"]:.2f}%，已明显高于观察价，注意不追高'))
-        if q['pct'] <= -5:
-            candidates.append(('sharp_down', '快速走弱', f'当前跌幅 {q["pct"]:.2f}%，需观察是否破位'))
-        if q['high'] and q['high'] / max(q['prev_close'], 0.01) - 1 >= 0.07 and price / q['high'] - 1 <= -0.03:
-            candidates.append(('intraday_fade', '冲高回落', f'盘中最高 {q["high"]:.2f}，现价 {price:.2f}，高点回落明显'))
+        is_position = item.get('pool_type') == 'position' or item.get('stage') == 'HOLD'
+        if is_position:
+            entry_price = float(item.get('entry_price') or trigger)
+            pct_from_entry = price / entry_price - 1 if entry_price else 0.0
+            crossed_below_entry = last > 0 and last >= entry_price and price < entry_price
+            crossed_over_entry = last > 0 and last < entry_price and price >= entry_price
+            if price <= invalid:
+                candidates.append(('hold_invalid', 'HOLD风控', f'当前价 {price:.2f} 已跌破HOLD止损 {invalid:.2f}'))
+            elif pct_from_invalid <= 0.03:
+                candidates.append(('hold_near_invalid', 'HOLD接近止损', f'当前价 {price:.2f} 距HOLD止损 {invalid:.2f} 约 {pct_from_invalid*100:.1f}%'))
+            if crossed_below_entry or pct_from_entry <= -0.015:
+                candidates.append(('hold_cost_loss', 'HOLD跌破成本', f'当前价 {price:.2f} 低于成本观察线 {entry_price:.2f}（{pct_from_entry*100:.1f}%）'))
+            if crossed_over_entry and q['pct'] > 0:
+                candidates.append(('hold_recover_cost', 'HOLD回收成本', f'从成本下方回收 {entry_price:.2f}，当前 {price:.2f}'))
+            if pct_from_entry >= 0.06 or (q['pct'] >= 5 and price > entry_price):
+                candidates.append(('hold_profit_take', 'HOLD浮盈观察', f'相对成本 {entry_price:.2f} 浮盈约 {pct_from_entry*100:.1f}%，观察减仓/T机会'))
+        else:
+            near_entry_zone = price <= zone_high * 1.01
+            meaningful_underwater_cross = crossed_under_trigger and near_entry_zone
+            meaningful_strong_up = q['pct'] >= 7 and price > trigger * 1.03
+            meaningful_intraday_fade = q['high'] and q['high'] / max(q['prev_close'], 0.01) - 1 >= 0.08 and price / q['high'] - 1 <= -0.04
+            if price <= invalid:
+                candidates.append(('invalid', '策略失效/风险', f'当前价 {price:.2f} 已跌破失效位 {invalid:.2f}'))
+            elif pct_from_invalid <= 0.015:
+                candidates.append(('near_invalid', '接近失效位', f'当前价 {price:.2f} 距失效位 {invalid:.2f} 约 {pct_from_invalid*100:.1f}%'))
+            if in_entry_zone and pct_from_invalid > 0.015:
+                candidates.append(('entry_zone', '观察买入时机', f'当前价 {price:.2f} 处于低吸观察区 {zone_low:.2f}–{zone_high:.2f}'))
+            if price < trigger and pct_from_invalid > 0.015:
+                event = 'underwater_cross' if meaningful_underwater_cross else 'underwater'
+                candidates.append((event, 'D3水下观察', f'当前价 {price:.2f} 低于观察价 {trigger:.2f}（{pct_from_trigger*100:.1f}%）'))
+            if crossed_over_trigger and previous_status == 'underwater' and q['pct'] > 0:
+                candidates.append(('recover_trigger', '水下回收观察价', f'从观察价下方回到 {trigger:.2f} 上方，当前 {price:.2f}'))
+            if meaningful_strong_up:
+                candidates.append(('strong_up', '强势拉升', f'当前涨幅 {q["pct"]:.2f}%，已明显高于观察价，注意不追高'))
+            if q['pct'] <= -5:
+                candidates.append(('sharp_down', '快速走弱', f'当前跌幅 {q["pct"]:.2f}%，需观察是否破位'))
+            if meaningful_intraday_fade:
+                candidates.append(('intraday_fade', '冲高回落', f'盘中最高 {q["high"]:.2f}，现价 {price:.2f}，高点回落明显'))
 
         if not candidates:
+            previous_status = alert_statuses.get(code)
+            alert_statuses[code] = 'observe'
             append_jsonl(EVENTS_JSONL_PATH, {
                 'local_time': now.isoformat(timespec='seconds'),
                 'event': 'snapshot_no_alert',
+                'tier': alert_tier('observe'),
+                'status': 'observe',
+                'previous_status': previous_status,
+                'push': False,
                 'code': code,
                 'name': item['name'],
                 'price': price,
@@ -405,9 +502,17 @@ def build_alerts(now: datetime, quotes: dict[str, dict[str, Any]], state: dict[s
             continue
 
         for ev, title, reason in sorted(candidates, key=lambda c: EVENT_PRIORITY.get(c[0], 99))[:1]:
+            current_status = alert_status(ev)
+            previous_status = alert_statuses.get(code)
+            push = should_push_alert(ev, previous_status, current_status)
+            alert_statuses[code] = current_status
             record = {
                 'local_time': now.isoformat(timespec='seconds'),
                 'event': ev,
+                'tier': alert_tier(ev),
+                'status': current_status,
+                'previous_status': previous_status,
+                'push': push,
                 'title': title,
                 'code': code,
                 'name': item['name'],
@@ -427,12 +532,15 @@ def build_alerts(now: datetime, quotes: dict[str, dict[str, Any]], state: dict[s
                 'quote_time': q.get('ts', ''),
             }
             append_jsonl(EVENTS_JSONL_PATH, record)
+            if not push:
+                continue
             industry = item.get('industry') or '未知行业'
             hhmm = format_hhmm(q.get('ts', ''))
             stop_distance = price / invalid - 1 if invalid else 0.0
             stage = item.get('stage') or f'{now:%m%d}D3'
             alerts.append({
                 'event': ev,
+                'tier': alert_tier(ev),
                 'stage': stage,
                 'code': code,
                 'name': item['name'],
@@ -559,6 +667,26 @@ def build_monitor_report(now: datetime, quotes: dict[str, dict[str, Any]], watch
     return '```text\n' + '\n'.join(lines).rstrip() + '\n```'
 
 
+def summarize_alerts(now: datetime, alerts: list[dict[str, Any]]) -> list[str]:
+    tier_counts: dict[str, int] = {}
+    label_counts: dict[str, int] = {}
+    focus: list[str] = []
+    for alert in alerts:
+        tier = str(alert.get('tier') or alert_tier(str(alert.get('event', ''))))
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+        label = status_label(str(alert.get('event', '')))
+        label_counts[label] = label_counts.get(label, 0) + 1
+        if len(focus) < 3:
+            focus.append(f'{alert.get("code")} {alert.get("name")}')
+    parts = [f'{key}{tier_counts[key]}' for key in sorted(tier_counts)]
+    labels = [f'{label}{count}' for label, count in sorted(label_counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+    return [
+        f'【A股监控】{now:%m%d} {now:%H:%M}｜推送{len(alerts)}只｜{" / ".join(parts)}',
+        f'状态：{"｜".join(labels)}',
+        f'优先看：{"、".join(focus)}' if focus else '优先看：无',
+    ]
+
+
 def write_watchlist_csv(watchlist: list[dict[str, Any]] | None = None) -> None:
     path = WATCHLIST_CSV_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -566,7 +694,7 @@ def write_watchlist_csv(watchlist: list[dict[str, Any]] | None = None) -> None:
         return
     watchlist = watchlist or WATCHLIST
     with path.open('w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=['code', 'name', 'industry', 'stage', 'pool_type', 'source_file', 'trigger_price', 'invalid_price', 'zone_low', 'zone_high', 'rank', 'score', 'note'])
+        writer = csv.DictWriter(f, fieldnames=['code', 'name', 'industry', 'stage', 'pool_type', 'pool_subtype', 'source_file', 'trigger_price', 'invalid_price', 'zone_low', 'zone_high', 'rank', 'score', 'note'])
         writer.writeheader()
         writer.writerows(watchlist)
 
@@ -603,17 +731,12 @@ def main() -> int:
         state['last_alert_flush_at'] = now.isoformat(timespec='seconds')
         save_state(state)
         ordered = sorted(queued_alerts, key=alert_sort_key)
-        visible = ordered[:3]
-        dropped = len(ordered) - len(visible)
-        lines = []
-        for alert in visible:
-            if lines:
-                lines.append('')
+        lines = summarize_alerts(now, ordered)
+        for alert in ordered:
+            lines.append('')
             lines.append(format_alert(alert))
-        if dropped > 0:
-            lines.extend(['', f'另有 {dropped} 个较低优先级事件已只写入本地日志，避免微信/iLink 限流。'])
         out = '```text\n' + '\n'.join(lines) + '\n```'
-        append_log(f'[{now:%Y-%m-%d %H:%M:%S}] sent queued_alert events={len(queued_alerts)} visible={len(visible)} dropped={dropped}')
+        append_log(f'[{now:%Y-%m-%d %H:%M:%S}] sent queued_alert events={len(queued_alerts)} visible={len(ordered)} dropped=0')
         print(out)
     else:
         if pending_snapshot_due(now, state):

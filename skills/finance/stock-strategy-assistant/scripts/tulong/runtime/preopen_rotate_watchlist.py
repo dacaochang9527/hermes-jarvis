@@ -21,7 +21,7 @@ VALIDATION_PATH = WATCHLIST_DIR / 'tulong_d3_preopen_validation.json'
 MAIN_BOARD_PREFIXES = ('600', '601', '603', '605', '000', '001', '002', '003')
 FILTER_PREFIXES = ('300', '301', '688', '689', '8', '4', '9')
 ACTIVE_FIELDNAMES = [
-    'code', 'name', 'industry', 'stage', 'pool_type', 'source_file',
+    'code', 'name', 'industry', 'stage', 'pool_type', 'pool_subtype', 'source_file',
     'trigger_price', 'invalid_price', 'zone_low', 'zone_high',
     'rank', 'score', 'note',
     'entry_date', 'entry_stage', 'entry_price', 'quantity',
@@ -71,7 +71,10 @@ def latest_matching(patterns: list[str]) -> Path | None:
 
 def find_latest_source(now: datetime, stage: str, pool_type: str) -> Path | None:
     label = label_for(now, stage)
-    return latest_matching([f'{label}_{pool_type}_*_*.csv'])
+    return latest_matching([
+        f'{label}_{pool_type}_*_*.csv',
+        f'{label}_*_{pool_type}_*_*.csv',
+    ])
 
 
 def find_sources(now: datetime) -> list[Path]:
@@ -93,7 +96,12 @@ def infer_stage_pool(src: Path) -> tuple[str, str]:
     if len(parts) < 3:
         raise RuntimeError(f'invalid source filename: {src.name}')
     stage = parts[0]
-    pool_type = parts[1]
+    if 'watch' in parts[1:]:
+        pool_type = 'watch'
+    elif 'position' in parts[1:]:
+        pool_type = 'position'
+    else:
+        pool_type = parts[1]
     if pool_type not in VALID_POOL_TYPES:
         raise RuntimeError(f'invalid pool_type in filename: {src.name}')
     return stage, pool_type
@@ -121,6 +129,10 @@ def normalize_source_rows(src: Path) -> tuple[list[dict[str, str]], list[str]]:
                 raise RuntimeError(f'HOLD only accepts position rows: code={code} pool_type={pool_type} source={src.name}')
             if pool_type == 'watch' and not str(stage).endswith('D3'):
                 raise RuntimeError(f'watch rows must use MMDDD3 stage: code={code} stage={stage} source={src.name}')
+            pool_subtype = (row.get('pool_subtype') or 'active').strip().lower()
+            if pool_type == 'watch' and pool_subtype != 'active':
+                filtered.append(f'{code} {row.get("name", "")} pool_subtype={pool_subtype}_not_rotated'.strip())
+                continue
             out = {name: row.get(name, '') for name in ACTIVE_FIELDNAMES}
             out.update({
                 'code': code,
@@ -128,6 +140,7 @@ def normalize_source_rows(src: Path) -> tuple[list[dict[str, str]], list[str]]:
                 'industry': row.get('industry', ''),
                 'stage': stage,
                 'pool_type': pool_type,
+                'pool_subtype': pool_subtype,
                 'source_file': row.get('source_file') or src.name,
                 'trigger_price': row.get('trigger_price', ''),
                 'invalid_price': row.get('invalid_price', ''),
@@ -216,6 +229,7 @@ def derive_open_positions_from_trades(now: datetime) -> list[dict[str, str]]:
             'industry': '',
             'stage': 'HOLD',
             'pool_type': 'position',
+            'pool_subtype': 'hold',
             'source_file': str(TRADES_PATH.relative_to(PROJECT)),
             'trigger_price': fmt_price(entry_price),
             'invalid_price': fmt_price(entry_price * 0.92),

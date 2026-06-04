@@ -76,6 +76,9 @@ class Candidate:
     flags: str
 
 
+ACTIVE_SCORE_THRESHOLD = 70.0
+RADAR_SCORE_THRESHOLD = 50.0
+
 AUTO_NARROW_EXCLUDE_FLAGS = (
     "高开低走",
     "D2仍大涨",
@@ -87,6 +90,7 @@ AUTO_NARROW_EXCLUDE_FLAGS = (
     "量能过大",
     "缩量过弱",
     "上引线过长",
+    "高价风险",
 )
 
 
@@ -174,13 +178,15 @@ def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
     elif first_seal_i <= 100000:
         score += 5; notes.append("D1较早封板")
     elif first_seal_i >= 140000:
-        score -= 5; notes.append("D1尾盘封板降权"); flags.append("尾盘板")
+        score -= 18; notes.append("D1尾盘封板强降权"); flags.append("尾盘板"); flags.append("radar_only")
     if breaks == 0:
         score += 5; notes.append("D1未炸板")
     elif breaks <= 2:
         score += 1; notes.append(f"D1炸板{int(breaks)}次")
+    elif breaks < 4:
+        score -= 12; notes.append(f"D1炸板{int(breaks)}次偏多"); flags.append("炸板偏多")
     else:
-        score -= 6; notes.append(f"D1炸板{int(breaks)}次偏多"); flags.append("炸板偏多")
+        score -= 22; notes.append(f"D1炸板{int(breaks)}次严重偏多"); flags.append("炸板偏多"); flags.append("radar_only")
     if fund >= 80_000_000:
         score += 5; notes.append("封板资金较足")
     elif fund < 10_000_000:
@@ -198,7 +204,7 @@ def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
         score -= 20; notes.append(f"D2量比超过3倍{vol_ratio:.2f}"); flags.append("量能过大")
 
     if strong_continuation:
-        score += 16; notes.append("D2强势延续"); flags.append("strong_continuation")
+        score += 2; notes.append("D2强势延续降权，先看可参与性"); flags.append("strong_continuation")
     elif close_below_high > 0.08:
         score -= 12; notes.append("D2上引线太长"); flags.append("上引线过长")
     elif close_below_high >= 0.05:
@@ -224,12 +230,23 @@ def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
     if open_gap > 0.04 and d2.close < d2.open:
         score -= 10; notes.append("D2高开低走风险"); flags.append("高开低走")
 
-    if 200_000_000 <= amount <= 3_000_000_000:
+    if d2.close >= 100:
+        score -= 18; notes.append(f"百元高价{int(d2.close)}默认不进active"); flags.append("高价风险"); flags.append("radar_only")
+    elif d2.close >= 80:
+        score -= 10; notes.append(f"高价{int(d2.close)}降权"); flags.append("高价风险")
+    elif d2.close >= 50:
+        score -= 3; notes.append(f"中高价{int(d2.close)}谨慎")
+
+    if 200_000_000 <= amount <= 1_500_000_000:
         score += 5; notes.append("成交额可跟踪")
+    elif 1_500_000_000 < amount <= 2_000_000_000:
+        score -= 6; notes.append("成交额超过15亿降权"); flags.append("成交拥挤")
+    elif 2_000_000_000 < amount <= 4_000_000_000:
+        score -= 14; notes.append("成交额超过20亿强降权"); flags.append("成交拥挤"); flags.append("radar_only")
     elif amount < 100_000_000:
         score -= 8; notes.append("成交额偏小"); flags.append("成交小")
-    elif amount > 5_000_000_000:
-        score -= 5; notes.append("成交额过大偏拥挤"); flags.append("成交拥挤")
+    elif amount > 4_000_000_000:
+        score -= 18; notes.append("成交额过大偏拥挤"); flags.append("成交拥挤"); flags.append("radar_only")
     if turnover > 35:
         score -= 8; notes.append("换手过高降噪"); flags.append("换手过高")
     elif 3 <= turnover <= 20:
@@ -237,7 +254,7 @@ def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
 
     if d2.pct_chg is not None and d2.pct_chg > 7:
         if strong_continuation:
-            score += 5; notes.append("D2高强度延续，归入强势确认观察")
+            score -= 4; notes.append("D2高强度延续，不直接奖励进active"); flags.append("D2高强度")
         else:
             score -= 10; notes.append("D2仍大涨，容易变追高"); flags.append("D2仍大涨")
     if d2.pct_chg is not None and d2.pct_chg < -5:
@@ -246,10 +263,44 @@ def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
     return score, "；".join(notes), "；".join(flags)
 
 
+def flag_set(candidate: Candidate) -> set[str]:
+    return {part.strip() for part in str(candidate.flags or "").split("；") if part.strip()}
+
+
+def entry_comfort(candidate: Candidate) -> float:
+    """Estimate D3 executable comfort: higher means closer to a usable zone with clear risk."""
+    if candidate.trigger_price <= 0 or candidate.invalid_price <= 0:
+        return -9.99
+    zone_gap = (candidate.zone_low / candidate.trigger_price) - 1
+    risk_width = (candidate.zone_low / candidate.invalid_price) - 1
+    pullback_bonus = min(candidate.d2_pullback, 0.08)
+    # 买点区应尽量在观察价附近/下方；若买点区已高于观察价，本质更像追高，舒适度强降。
+    executable_gap = -abs(zone_gap) if zone_gap <= 0 else -(zone_gap * 4)
+    return executable_gap + min(risk_width, 0.08) + pullback_bonus
+
+
+def pool_subtype_for(candidate: Candidate) -> str:
+    flags = flag_set(candidate)
+    comfort = entry_comfort(candidate)
+    strong = "strong_continuation" in flags or "D2高强度" in flags
+    radar_reasons = {"radar_only", "成交拥挤", "高价风险", "尾盘板", "炸板偏多"}
+    if "exclude" in flags:
+        return "exclude"
+    if candidate.score < RADAR_SCORE_THRESHOLD:
+        return "backup"
+    if flags & radar_reasons:
+        return "radar"
+    if strong and (comfort < 0.08 or "回落不足" in flags):
+        return "radar"
+    if candidate.score >= ACTIVE_SCORE_THRESHOLD and comfort >= 0.06:
+        return "active"
+    return "radar"
+
+
 def auto_narrow_candidates(candidates: list[Candidate], limit: int) -> tuple[list[Candidate], list[Candidate]]:
     """Keep D3 scan outputs current by narrowing every generated candidate set."""
-    ranked = sorted(candidates, key=lambda c: c.score, reverse=True)
-    preferred = [c for c in ranked if not any(flag in c.flags for flag in AUTO_NARROW_EXCLUDE_FLAGS)]
+    ranked = sorted(candidates, key=lambda c: (c.score, entry_comfort(c)), reverse=True)
+    preferred = [c for c in ranked if pool_subtype_for(c) == "active" and not any(flag in c.flags for flag in AUTO_NARROW_EXCLUDE_FLAGS)]
     fallback = [c for c in ranked if c not in preferred]
     selected = (preferred + fallback)[:limit]
     return selected, [c for c in ranked if c not in selected]
@@ -375,8 +426,20 @@ def generate(args: SelectionArgs) -> OutputPaths:
     write_d1_outputs(paths, args.d3_label, args.d1_date, zt, d1_kept, d1_excluded)
 
     raw.sort(key=lambda c: c.score, reverse=True)
-    selected, narrowed_out = auto_narrow_candidates(raw, args.max_candidates)
-    report_candidates = selected[:args.max_report]
+    selected, narrowed_out = auto_narrow_candidates(raw, args.max_candidates + 10)
+
+    active_count = min(8, args.max_candidates)
+    active_candidates = [c for c in selected if pool_subtype_for(c) == "active"][:active_count]
+    radar_candidates = [c for c in selected if pool_subtype_for(c) == "radar" and c not in active_candidates][:6]
+    extra_radar = [c for c in narrowed_out if pool_subtype_for(c) == "radar"
+                   and c not in active_candidates and c not in radar_candidates][:6 - len(radar_candidates)]
+    radar_candidates.extend(extra_radar)
+    all_candidates = active_candidates + radar_candidates[:6]
+    narrowed_out = [c for c in (selected + narrowed_out) if c not in all_candidates]
+    report_candidates = all_candidates[:args.max_report]
+
+    def subtype_label(c):
+        return pool_subtype_for(c)
 
     lines = [
         f"# {args.d3_label} 自动窄化扫描（D1={args.d1_date:%m%d}首板，D2={args.d2_date:%m%d}确认）",
@@ -384,12 +447,12 @@ def generate(args: SelectionArgs) -> OutputPaths:
         f"- D1首板池日期：{d1_date_str}",
         f"- 主板首板观察检查：{checked} 只",
         f"- 通过D2过滤规则：{len(raw)} 只",
-        f"- 自动窄化后输出：{len(selected)} 只",
-        "- 说明：每次生成或更新 D3 初选时按规则自动检查和窄化，外部信息只作为规则输入。",
+        f"- 自动窄化后输出 active：{len(active_candidates)} 只，radar：{len(radar_candidates)} 只",
+        "- 说明：active 为正式 D3 观察池（可参与）；radar 为强势雷达（慎追）。外部信息只作为规则输入。",
         "",
-        "## 自动窄化保留排序",
+        "## active D3 观察池",
     ]
-    for i, c in enumerate(report_candidates, 1):
+    for i, c in enumerate(active_candidates, 1):
         lines.append(f"### {i}. {c.code} {c.name}｜{c.industry}｜评分 {c.score:.1f}")
         lines.append(f"- 观察价 {c.trigger_price:.2f}｜买点区 {c.zone_low:.2f}–{c.zone_high:.2f}｜失效 {c.invalid_price:.2f}")
         lines.append(f"- D2 收 {c.d2_close:.2f}，高 {c.d2_high:.2f}，低 {c.d2_low:.2f}，涨跌 {c.d2_pct:.2f}%，成交额 {fmt_yi(c.d2_amount)}，换手 {c.d2_turnover:.2f}%")
@@ -399,6 +462,18 @@ def generate(args: SelectionArgs) -> OutputPaths:
         if c.flags:
             lines.append(f"- 风险标记：{c.flags}")
         lines.append("")
+    if radar_candidates:
+        lines.append("## radar 强势雷达")
+        for i, c in enumerate(radar_candidates, 1):
+            lines.append(f"### {i}. {c.code} {c.name}｜{c.industry}｜评分 {c.score:.1f}")
+            lines.append(f"- 观察价 {c.trigger_price:.2f}｜买点区 {c.zone_low:.2f}–{c.zone_high:.2f}｜失效 {c.invalid_price:.2f}")
+            lines.append(f"- D2 收 {c.d2_close:.2f}，高 {c.d2_high:.2f}，低 {c.d2_low:.2f}，涨跌 {c.d2_pct:.2f}%，成交额 {fmt_yi(c.d2_amount)}，换手 {c.d2_turnover:.2f}%")
+            lines.append(f"- 结构：D2/D1量比 {c.d2_volume_ratio:.2f}｜高点回落 {c.d2_pullback*100:.1f}%｜安全垫 {c.above_support*100:.1f}%")
+            lines.append(f"- D1封板结构：首次封板 {c.d1_first_seal}｜炸板 {c.d1_open_breaks}｜封板资金 {fmt_yi(c.d1_fund)}")
+            lines.append(f"- note：{c.note}")
+            if c.flags:
+                lines.append(f"- 风险标记：{c.flags}")
+            lines.append("")
     lines.append("## 部分剔除原因样本")
     for code, name, why in rejects[:40]:
         lines.append(f"- {code} {name}：{why}")
@@ -410,15 +485,17 @@ def generate(args: SelectionArgs) -> OutputPaths:
 
     paths.report.write_text("\n".join(lines), encoding="utf-8")
     with paths.csv.open("w", newline="", encoding="utf-8") as f:
-        fields = ["code","name","industry","stage","pool_type","source_file","trigger_price","invalid_price","zone_low","zone_high","rank","score","note"]
+        fields = ["code","name","industry","stage","pool_type","pool_subtype","source_file","trigger_price","invalid_price","zone_low","zone_high","rank","score","note"]
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
-        for i, c in enumerate(selected, 1):
+        for i, c in enumerate(all_candidates, 1):
+            psub = subtype_label(c)
             w.writerow({
                 "code": c.code, "name": c.name, "industry": c.industry, "stage": args.d3_label, "pool_type": "watch",
+                "pool_subtype": psub,
                 "source_file": paths.csv.name, "trigger_price": f"{c.trigger_price:.2f}", "invalid_price": f"{c.invalid_price:.2f}",
                 "zone_low": f"{c.zone_low:.2f}", "zone_high": f"{c.zone_high:.2f}", "rank": i, "score": f"{c.score:.1f}",
-                "note": f"{args.d3_label}｜watch｜scan｜{c.note}",
+                "note": f"{args.d3_label}｜watch｜{psub}｜{c.note}",
             })
     return paths
 

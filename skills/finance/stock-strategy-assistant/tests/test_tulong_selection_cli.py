@@ -69,11 +69,41 @@ def test_infer_label_from_d3_date_when_label_omitted():
     assert args.d3_label == "0529D3"
 
 
+def candidate(**overrides):
+    base = dict(
+        code="600000", score=80, flags="", trigger_price=10.0, invalid_price=9.0,
+        zone_low=9.85, zone_high=10.03, d2_pullback=0.04,
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
 def test_auto_narrow_prefers_candidates_without_severe_flags():
     mod = load_module()
-    clean = SimpleNamespace(code="600000", score=80, flags="")
-    risky = SimpleNamespace(code="600001", score=99, flags="高开低走")
+    clean = candidate(code="600000", score=80, flags="")
+    risky = candidate(code="600001", score=99, flags="高开低走")
     selected, narrowed_out = mod.auto_narrow_candidates([risky, clean], 1)
 
     assert selected == [clean]
     assert narrowed_out == [risky]
+
+
+def test_strong_continuation_without_entry_comfort_routes_to_radar():
+    mod = load_module()
+    strong_far = candidate(score=88, flags="strong_continuation", zone_low=10.15, zone_high=10.25, d2_pullback=0.005)
+
+    assert mod.pool_subtype_for(strong_far) == "radar"
+
+
+def test_comfortable_candidate_routes_to_active():
+    mod = load_module()
+    comfortable = candidate(score=78, flags="", zone_low=9.88, zone_high=10.03, d2_pullback=0.04)
+
+    assert mod.pool_subtype_for(comfortable) == "active"
+
+
+def test_hard_risk_flags_route_to_radar_even_with_high_score():
+    mod = load_module()
+    crowded = candidate(score=92, flags="成交拥挤；radar_only", zone_low=9.88, zone_high=10.03, d2_pullback=0.04)
+
+    assert mod.pool_subtype_for(crowded) == "radar"

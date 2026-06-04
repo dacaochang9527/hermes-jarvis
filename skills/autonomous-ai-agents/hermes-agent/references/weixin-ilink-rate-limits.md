@@ -29,7 +29,9 @@ send_message(action="send", target="weixin:<target>", message="短测试：gatew
 
 4. If cron/watchdog jobs were recently delivering to Weixin, list cron jobs and identify noisy jobs separately from gateway health. A job can run successfully while Weixin delivery is rate-limited.
 
-5. Report three statuses separately: gateway connectivity, model/API generation health, and Weixin/iLink delivery health. If a test message succeeds, say the channel is currently recovered, while still noting any earlier rate-limit/model failures.
+5. If the user asks to route around Weixin limits, temporarily move the noisy jobs to another connected platform such as Feishu instead of repeatedly testing Weixin. With the `cronjob` tool, first list jobs, then update the exact job IDs with `deliver="feishu"`. Preserve each job's existing `schedule`, `script`, `no_agent`, `enabled_toolsets`, `workdir`, and human-readable `name` when passing update arguments so the update does not accidentally rename the job or trigger schedule validation on empty fields. Re-list jobs afterward and confirm `deliver` changed.
+
+6. Report three statuses separately: gateway connectivity, model/API generation health, and Weixin/iLink delivery health. If a test message succeeds, say the channel is currently recovered, while still noting any earlier rate-limit/model failures.
 
 ## Confirm it is iLink delivery rate limiting
 

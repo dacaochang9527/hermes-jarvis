@@ -13,6 +13,8 @@ interrupt_debug.log
 # --- Personal / chat state ---
 sessions/
 memories/
+feishu_seen_message_ids.json
+image_cache/
 
 # --- Local locks ---
 auth.lock

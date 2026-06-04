@@ -18,7 +18,8 @@ LOG_PATH = PROJECT / 'reports/alerts/tulong_d3_monitor.log'
 MAIN_BOARD_PREFIXES = ('600', '601', '603', '605', '000', '001', '002', '003')
 FILTER_PREFIXES = ('300', '301', '688', '689', '8', '4', '9')
 VALID_POOL_TYPES = {'watch', 'position'}
-REQUIRED_COMMON = ('industry', 'stage', 'pool_type', 'source_file', 'trigger_price', 'invalid_price', 'zone_low', 'zone_high')
+REQUIRED_COMMON = ('stage', 'pool_type', 'source_file', 'trigger_price', 'invalid_price', 'zone_low', 'zone_high')
+REQUIRED_WATCH = ('industry',)
 REQUIRED_POSITION = ('entry_date', 'entry_stage', 'entry_price', 'quantity', 'sellable_quantity')
 
 
@@ -92,6 +93,8 @@ def validate(now: datetime) -> tuple[list[str], dict[str, Any]]:
         if not is_main_board(code):
             bad_prefix.append(f'{code} {row.get("name", "")}'.strip())
         missing = [key for key in REQUIRED_COMMON if not row.get(key)]
+        if pool_type == 'watch':
+            missing.extend(key for key in REQUIRED_WATCH if not row.get(key))
         if pool_type == 'position':
             missing.extend(key for key in REQUIRED_POSITION if not row.get(key))
         if missing:

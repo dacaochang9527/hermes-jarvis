@@ -17,6 +17,7 @@ from scripts.tulong.runtime.watchdog import load_watchlist, fetch_quotes, entry_
 
 REPORT_DIR = PROJECT / 'reports/reviews'
 ALERT_DIR = PROJECT / 'reports/alerts'
+TRADES_PATH = PROJECT / 'data/trades/tulong_trades.csv'
 
 
 def today() -> str:
@@ -51,6 +52,49 @@ def fnum(v: Any) -> float:
         return float(v)
     except Exception:
         return 0.0
+
+
+def load_trade_rows(path: Path = TRADES_PATH) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open(newline='', encoding='utf-8-sig') as f:
+        return list(csv.DictReader(f))
+
+
+def classify_trade(row: dict[str, str], active_codes: set[str], radar_codes: set[str], review_date: str) -> str:
+    if (row.get('trade_date') or '').replace('-', '') != review_date:
+        return 'other_day'
+    name = row.get('name', '')
+    note = row.get('note', '')
+    code = str(row.get('code', '')).zfill(6)
+    session = row.get('session_label') or row.get('position_ref') or ''
+    text = f'{name} {note} {session}'.upper()
+    if 'ETF' in text or '基金' in text or code.startswith(('510', '511', '512', '513', '515', '516', '517', '518', '159', '588')):
+        return 'ETF'
+    if code in active_codes:
+        return 'D3 active交易'
+    if code in radar_codes:
+        return 'D3 radar观察但未买'
+    if 'HOLD' in text or (row.get('position_ref') and row.get('position_ref') != row.get('session_label')):
+        return 'HOLD管理'
+    return '策略外交易'
+
+
+def summarize_trade_attribution(watchlist: list[dict[str, Any]], review_date: str) -> dict[str, list[dict[str, str]]]:
+    active_codes = {item['code'] for item in watchlist if item.get('pool_type') == 'watch' and (item.get('pool_subtype') or 'active') == 'active'}
+    radar_codes = {item['code'] for item in watchlist if item.get('pool_type') == 'watch' and item.get('pool_subtype') == 'radar'}
+    buckets = {
+        'D3 active交易': [],
+        'D3 radar观察但未买': [],
+        'HOLD管理': [],
+        '策略外交易': [],
+        'ETF': [],
+    }
+    for row in load_trade_rows():
+        bucket = classify_trade(row, active_codes, radar_codes, review_date)
+        if bucket in buckets:
+            buckets[bucket].append(row)
+    return buckets
 
 
 def summarize_snapshots(rows: list[dict[str, str]]) -> dict[str, dict[str, Any]]:
@@ -90,21 +134,34 @@ def render_review() -> str:
     for event in events:
         event_by_code[str(event.get('code', ''))].append(event)
 
+    trade_buckets = summarize_trade_attribution(watchlist, date_key)
+    active_count = sum(1 for item in watchlist if item.get('pool_type') == 'watch' and (item.get('pool_subtype') or 'active') == 'active')
+    radar_count = sum(1 for item in watchlist if item.get('pool_type') == 'watch' and item.get('pool_subtype') == 'radar')
+    hold_count = sum(1 for item in watchlist if item.get('pool_type') == 'position' or item.get('stage') == 'HOLD')
     lines = [
-        f'# 0527D3主板{len(watchlist)}股盘中复盘 {now:%Y-%m-%d}',
+        f'# 屠龙D3盘中复盘 {now:%Y-%m-%d}',
         '',
         f'生成时间：{now:%Y-%m-%d %H:%M:%S}',
         '',
         '## 总览',
         '',
-        f'- 监控标的：{len(watchlist)} 只',
+        f'- 监控标的：{len(watchlist)} 只（active {active_count} / radar {radar_count} / HOLD {hold_count}）',
         f'- 行情快照记录：{len(snapshots)} 条',
         f'- 结构化事件记录：{len(events)} 条',
         '- 口径：观察、买入时机提示、风险/失效提醒；不是确定性交易指令。',
         '',
-        '## 个股复盘',
+        '## 交易归因',
         '',
     ]
+    for bucket_name, rows in trade_buckets.items():
+        lines.append(f'### {bucket_name}（{len(rows)}笔）')
+        if rows:
+            for row in rows:
+                lines.append(f'- {row.get("action", "")}｜{row.get("code", "")} {row.get("name", "")}｜数量 {row.get("quantity", "")}｜价格 {row.get("price", "")}｜ref {row.get("position_ref", "") or row.get("session_label", "")}｜{row.get("note", "")}')
+        else:
+            lines.append('- 无')
+        lines.append('')
+    lines.extend(['## 个股复盘', ''])
 
     for item in watchlist:
         code = item['code']

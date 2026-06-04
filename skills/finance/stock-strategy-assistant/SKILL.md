@@ -51,7 +51,9 @@ metadata:
 
 ## 屠龙专题路由
 
-当用户讨论“屠龙战术”、D1/D2/D3、D3观察区、HOLD 持仓、日期+D几、买点/失效位/参与区、规则输入修订时，加载：
+当用户讨论“屠龙战术”、D1/D2/D3、D3观察区、HOLD 持仓、日期+D几、买点/失效位/参与区、规则输入修订时，从本 skill 主入口分流；不要先尝试加载旧的 `tulong-tactics` 子技能名。
+
+加载：
 
 ```text
 references/tulong-current-rules.md
@@ -62,6 +64,28 @@ references/tulong-current-rules.md
 ```text
 references/tulong-operations.md
 ```
+
+当用户发送当天买卖/成交截图，要求“整理到交易文档/交易流水/持仓记录”时，加载：
+
+```text
+references/tulong-trade-screenshot-entry.md
+```
+
+## 屠龙会话纪律
+
+- 屠龙相关问题直接从本 skill 主入口分流到 `references/tulong-current-rules.md` / `references/tulong-operations.md`；不要先尝试旧名或子技能名 `tulong-tactics`，该入口在部分会话中不可见。
+- 屠龙盘中提醒的事件分层、状态去重、飞书全量输出和验证口径见 `references/tulong-monitoring-discipline.md`。
+- 当用户问“改完了吗 / 做了吗”时，必须区分“建议/判断”与“已落地并验证”。如果只是给过优化建议，不要暗示已经完成；应立即实现、运行验证，并说明验证结果。
+- 盘中监控和提醒优化属于运行流程变更：除了改脚本，也要同步 `references/tulong-operations.md`，并至少跑 `py_compile` 与一次 `FORCE_RUN=1` 验证用户可见输出。
+
+## 标准规则与朋友规则边界
+
+- 用户只说“生成 MMDDD3”时，默认使用标准主规则，输出文件为 `MMDDD3_watch_scan_YYYYMMDD_HHMMSS.csv`。
+- 用户明确说“按朋友规则 / new_strategy / new_strategy_full / 昨天那10只口径 / 做对照”时，才额外生成外部策略结果或做差异对照。
+- 调整策略规则时，优先改动标准主规则（`generate_d3_candidates.py` 的 `score_candidate()` + 当前规则文档）；朋友规则先保持为外部策略输入/对照实验。
+- 不要因为某天朋友规则表现较好就把它静默设成默认。吸收朋友规则有效部分应走正式规则变更协议：先在复盘确认，再修改标准主规则和同步各层。
+- 当复盘结论是“标准规则负责不漏强，new_strategy_full 负责能不能做”这类权重重排时，默认处理为标准主规则吸收可参与性权重，而不是把外部策略设为默认；重点检查 active/radar 分层、`pool_subtype` 输出、preopen 只切 active、复盘归因拆分是否同步。
+- D3 交易归因必须拆分为 D3 active、D3 radar、HOLD/T、策略外、ETF；当日 D3 策略胜率只统计 active 内交易，不混入 HOLD/T、策略外或 ETF。
 
 ## 维护纪律
 

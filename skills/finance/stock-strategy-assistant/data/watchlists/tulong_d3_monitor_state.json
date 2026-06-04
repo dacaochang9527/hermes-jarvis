@@ -1,24 +1,55 @@
 {
-  "sent": {},
-  "last_prices": {},
+  "last_prices": {
+    "000586": 16.68,
+    "600360": 13.71,
+    "603997": 15.19,
+    "000960": 41.82,
+    "002876": 31.92,
+    "600345": 54.22,
+    "600362": 46.05,
+    "002314": 2.5,
+    "600114": 39.55,
+    "600459": 24.23,
+    "000539": 9.17,
+    "001269": 27.52,
+    "002421": 4.74,
+    "600160": 38.3,
+    "600596": 14.34
+  },
   "pending_snapshot": null,
-  "last_event_run_at": null,
+  "last_event_run_at": "2026-06-04T14:59:41",
   "watchlist_source": [
-    "0603D3_watch_manual_review_20260603_082941.csv",
+    "0604D3_new_strategy_full_watch_scan_20260604_015049.csv",
     "data/trades/tulong_trades.csv"
   ],
-  "watch_date": "2026-06-03",
+  "watch_date": "2026-06-04",
   "stages": [
-    "0603D3",
+    "0604D3",
     "HOLD"
   ],
   "pool_types": [
     "position",
     "watch"
   ],
-  "updated_at": "2026-06-03T23:56:33",
-  "filtered_out": [
-    "002421 达实智能 duplicated_as_HOLD_from_trades",
-    "600596 新安股份 duplicated_as_HOLD_from_trades"
-  ]
+  "updated_at": "2026-06-04T09:13:14",
+  "filtered_out": [],
+  "pending_alerts": [],
+  "last_alert_flush_at": "2026-06-04T14:55:38",
+  "alert_statuses": {
+    "000586": "observe",
+    "600360": "observe",
+    "603997": "entry_zone",
+    "000960": "underwater",
+    "002876": "observe",
+    "600345": "observe",
+    "600362": "underwater",
+    "002314": "entry_zone",
+    "600114": "observe",
+    "600459": "entry_zone",
+    "000539": "profit_take",
+    "001269": "profit_take",
+    "002421": "cost_loss",
+    "600160": "cost_loss",
+    "600596": "observe"
+  }
 }

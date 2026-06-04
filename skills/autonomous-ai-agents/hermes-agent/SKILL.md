@@ -854,6 +854,16 @@ and logs — avoids shell-escaping backslashes in bash.
 3. Check `.env` has the right API key
 4. **Copilot 403**: `gh auth login` tokens do NOT work for Copilot API. You must use the Copilot-specific OAuth device code flow via `hermes model` → GitHub Copilot.
 
+**Empty responses / missing final replies on gateway text messages:** do not assume this is a media/vision or messaging-delivery issue just because nearby screenshots or image messages failed. When the user reports a normal text prompt produced no usable reply, search `~/.hermes/logs/gateway.log` and `~/.hermes/logs/agent.log` for the exact prompt text, then inspect the same session ID around that timestamp. Confirm:
+- whether gateway received the text and later logged `response ready` / `Sending response`;
+- whether `run_agent` logged `Empty response after tool calls`, `retry 1/3`, `retry 2/3`, `retry 3/3`, or `Fallback activated`;
+- the platform/session/history size on the `conversation turn` line;
+- token counts on subsequent `API call` lines, especially very large `in=` values, because long gateway sessions plus tool-call continuation can trigger empty responses from some custom/OpenAI-compatible providers;
+- whether fallback completed the turn successfully. If so, report the distinction clearly: delivery path may be healthy while the primary model returned empty and fallback rescued the turn;
+- whether auxiliary compression/summarization was unavailable (`Auxiliary auto-detect: no provider available`, `Compression, summarization, and memory flush will not work`), because this can let long gateway sessions grow until the primary provider starts returning empty content.
+
+When the user asks which model a platform uses, do not infer a platform-specific route from the final model in a turn. Check config plus `agent.log`: the `conversation turn` line shows the model/provider attempted for that platform, while `Turn ended` may show a fallback model. Fallback is per turn after primary failure, not a permanent Feishu/Weixin model assignment unless config explicitly says so. Practical mitigations are to reset/branch the long gateway session, reduce context, configure a working auxiliary compression provider, or temporarily promote the working fallback provider/model to primary while checking provider-side streaming/tool-call behavior.
+
 ### Memory migration from OpenClaw
 
 When reviewing or migrating old OpenClaw memory into Hermes, do not append `~/.openclaw` wholesale. Triage old files into Hermes USER memory, Hermes MEMORY, skills, setup/config, REVIEW, or DROP. See `references/openclaw-memory-migration.md` for the checklist and red flags.

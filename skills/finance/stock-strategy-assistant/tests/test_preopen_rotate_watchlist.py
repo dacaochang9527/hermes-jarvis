@@ -103,8 +103,8 @@ def test_write_active_watchlist_appends_trade_derived_hold(monkeypatch, tmp_path
 
     source = tmp_path / "0603D3_watch_scan_20260603_080000.csv"
     source.write_text(
-        "code,name,industry,stage,pool_type,trigger_price,invalid_price,zone_low,zone_high\n"
-        "600000,浦发银行,银行,0603D3,watch,10,9,9.8,10.1\n",
+        "code,name,industry,stage,pool_type,pool_subtype,trigger_price,invalid_price,zone_low,zone_high\n"
+        "600000,浦发银行,银行,0603D3,watch,active,10,9,9.8,10.1\n",
         encoding="utf-8",
     )
     trades.write_text(
@@ -125,6 +125,24 @@ def test_write_active_watchlist_appends_trade_derived_hold(monkeypatch, tmp_path
     assert "000001" in content
     assert "HOLD" in content
     assert "position_status" not in content.splitlines()[0]
+    assert "pool_subtype" in content.splitlines()[0]
+
+
+def test_preopen_filters_radar_rows_from_active_watchlist(monkeypatch, tmp_path):
+    mod = load_module()
+    monkeypatch.setattr(mod, "WATCHLIST_DIR", tmp_path)
+    source = tmp_path / "0603D3_watch_scan_20260603_085000.csv"
+    source.write_text(
+        "code,name,stage,pool_type,pool_subtype,trigger_price,invalid_price,zone_low,zone_high\n"
+        "600000,浦发银行,0603D3,watch,active,10,9,9.8,10.1\n"
+        "600001,雷达票,0603D3,watch,radar,10,9,9.8,10.1\n",
+        encoding="utf-8",
+    )
+
+    rows, filtered = mod.normalize_source_rows(source)
+
+    assert [row["code"] for row in rows] == ["600000"]
+    assert "600001 雷达票 pool_subtype=radar_not_rotated" in filtered
 
 
 def test_normalize_source_rows_rejects_hold_watch_rows(monkeypatch, tmp_path):
