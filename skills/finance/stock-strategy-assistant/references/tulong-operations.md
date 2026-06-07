@@ -42,9 +42,20 @@ D1/D2/D3 规则函数应在 `src/stock_assistant/strategy_tulong.py`，selection
 ```text
 MMDDD3_D1_filtered_YYYYMMDD_HHMMSS.csv
 MMDDD3*_watch*_YYYYMMDD_HHMMSS.csv
+MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv
 ```
 
-不要再生成或依赖只有 `HHMMSS` 的旧文件名。watch 源按当日 D 标签下最新 `MMDDD3*_watch*_YYYYMMDD_HHMMSS.csv` 选取，既支持标准 `MMDDD3_watch_scan_...`，也支持带策略标记的 `MMDDD3_new_strategy_full_watch_scan_...`。HOLD 当前持仓不再使用独立源文件，统一从 `data/trades/tulong_trades.csv` 汇总买卖记录派生。
+不要再生成或依赖只有 `HHMMSS` 的旧文件名。watch 源按当日 D 标签下最新 `MMDDD3*_watch*_YYYYMMDD_HHMMSS.csv` 选取，既支持标准 `MMDDD3_watch_scan_...`，也支持带策略标记的 `MMDDD3_new_strategy_full_watch_scan_...` 和消息面复核调整版 `MMDDD3_negative_adjusted_watch_scan_...`。HOLD 当前持仓不再使用独立源文件，统一从 `data/trades/tulong_trades.csv` 汇总买卖记录派生。
+
+手工/脚本生成调整版 CSV 后若要被 runtime 读取，必须使用无 BOM 的 UTF-8 写入；`preopen_rotate_watchlist.py` 当前用 `encoding='utf-8'` 读取 watch 源，UTF-8-SIG 会导致表头 `code` 变成带 BOM 的字段而所有 watch 行被跳过。生成后先用 `normalize_source_rows()` 或切池验证确认 active 行非空。调整版 CSV 的 `source_file` 字段应写成调整版文件自身，而不是原始标准池文件；否则 active CSV 虽能切入，但后续人工核对 source 时会误判来源。
+
+消息面/公告复核后调整 D3 列表的推荐落地顺序：
+
+1. 不直接改原标准 `MMDDD3_watch_scan_*`；另存 `MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv` 和对应报告。
+2. 将保留票设为 `pool_subtype=active`，低频观察设为 `radar`，减持/质押/权益变动/密集风险提示等降级票设为 `exclude`，并把公告原因写入 `note`。
+3. 用无 BOM UTF-8 写入，`source_file` 写调整版文件名自身。
+4. 运行 `preopen_rotate_watchlist.py --date YYYY-MM-DD --force` 切池；不要只生成 CSV 就说已经进入监控。
+5. 验证三处：`tulong_active_watchlist.csv` 的 watch active 行、`tulong_d3_monitor_state.json` 的 `watchlist_source/filtered_out`、`tulong_d3_preopen_validation.json` 的 `ok=true`。若 active 只剩 HOLD，多半是 CSV BOM 或字段名问题，先修复编码再重切。
 
 ## 买卖截图入账流程
 
@@ -83,6 +94,17 @@ MMDDD3*_watch*_YYYYMMDD_HHMMSS.csv
 - 调用 `watchdog.load_watchlist()` 做脚本级验证。
 
 `preopen_guard_check.py` 要读实际 active CSV 和 state，而不是只读观察源文件。成功静默，异常 stdout 投递。
+
+## 集合竞价查询与解读口径
+
+当前 runtime 没有独立的集合竞价专用数据源或专用推送模块；`watchdog.py` 从 09:25 开始通过新浪行情接口取少量自选股 quote，字段包含今开、昨收、现价、最高、最低、成交量、成交额、日期、时间。因此：
+
+- 不要把“没有专用集合竞价汇总消息”误判为“集合竞价获取不到”。
+- 用户问“集合竞价结果获取不到么”时，先查 `reports/alerts/tulong_d3_events_YYYYMMDD.jsonl` 中 `local_time` 为 09:25 的首轮记录，核对 `quote_time/price/pct/open/amount/status`。
+- 09:25 quote 能代表开盘/集合竞价附近结果，但不包含完整竞价盘口字段，例如未匹配量、委托队列、竞价量比、竞价强弱评分。
+- 若用户问“集合竞价对今天走势有什么影响”，不要只讲概念；要把 09:25 首轮记录与后续盘中事件/快照对比，按票输出：竞价强弱、是否进买点区、是否高开低走/低开承接、是否回收观察价或跌破成本线。
+- 判断语言保持信号化：集合竞价是“开盘资金态度”，不是全天结论；结合 09:30–10:00 承接验证后再分为“低开有承接 / 冲高回落 / 弱开弱走 / HOLD成本线压力”。
+- 如果用户需要每天固定看竞价，应新增一个 09:25 集合竞价汇总输出：即使无告警，也列出 active 与 HOLD 的竞价涨跌幅、竞价额/成交额、是否进入买点区、是否低于成本线；不要依赖普通告警触发才让用户看到竞价结果。
 
 ## 盘中提醒
 

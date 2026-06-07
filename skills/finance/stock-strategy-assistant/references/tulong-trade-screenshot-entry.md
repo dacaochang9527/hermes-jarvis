@@ -6,11 +6,13 @@
 
 ### 优先路径：macOS Vision OCR
 
-系统自带 Vision 框架对中文数字混合截图效果优于仅英文 tesseract。Swift 脚本已落 `/tmp/vision_ocr.swift`，可在任意会话复用：
+系统自带 Vision 框架对中文数字混合截图效果优于仅英文 tesseract。Skill 内置脚本：
 
 ```bash
-swift /tmp/vision_ocr.swift <image_path>
+swift scripts/vision_ocr.swift <image_path>
 ```
+
+如果历史会话已把脚本临时落到 `/tmp/vision_ocr.swift`，也可复用；但新会话优先使用 skill 内置脚本，避免 `/tmp` 被清理。
 
 ### 备用路径：tesseract
 

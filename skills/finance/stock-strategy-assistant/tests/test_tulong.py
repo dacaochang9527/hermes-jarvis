@@ -2,6 +2,14 @@ from datetime import date, timedelta
 
 import pytest
 
+from stock_assistant.strategy_tulong import (
+    D3CandidateProfile,
+    ACTIVE_POOL_CAP,
+    MIN_ACTIVE_SAFETY_BUFFER,
+    apply_d3_safety_adjustment,
+    d3_pool_subtype,
+    d3_safety_buffer,
+)
 from stock_assistant.models import DailyBar
 from stock_assistant.strategy_tulong import (
     build_d3_watch_signal,
@@ -160,3 +168,42 @@ def test_evaluate_d1_board_passes_for_valid_d1_row():
     result = evaluate_d1_board(d1_row())
     assert result.passed
     assert result.reject_reason == ""
+
+
+def d3_profile(**overrides):
+    return D3CandidateProfile(
+        score=float(overrides.get("score", 80.0)),
+        trigger_price=float(overrides.get("trigger_price", 10.0)),
+        invalid_price=float(overrides.get("invalid_price", 9.0)),
+        zone_low=float(overrides.get("zone_low", 9.85)),
+        zone_high=float(overrides.get("zone_high", 10.03)),
+        d2_pullback=float(overrides.get("d2_pullback", 0.04)),
+        flags=str(overrides.get("flags", "")),
+    )
+
+
+def test_d3_pool_subtype_routes_strong_continuation_to_radar_even_when_comfortable():
+    assert d3_pool_subtype(d3_profile(score=88, flags="strong_continuation", d2_pullback=0.06)) == "radar"
+
+
+def test_d3_pool_subtype_routes_thin_safety_buffer_to_radar():
+    profile = d3_profile(score=88, invalid_price=9.7, zone_low=9.92, d2_pullback=0.06)
+
+    assert d3_safety_buffer(profile) < MIN_ACTIVE_SAFETY_BUFFER
+    assert d3_pool_subtype(profile) == "radar"
+
+
+def test_d3_pool_subtype_keeps_comfortable_clean_candidate_active():
+    assert d3_pool_subtype(d3_profile(score=78)) == "active"
+
+
+def test_apply_d3_safety_adjustment_marks_thin_buffer():
+    score, note, flags = apply_d3_safety_adjustment(80, "原note", "", zone_low=9.92, invalid_price=9.7)
+
+    assert score == 72
+    assert "不进active" in note
+    assert "安全垫薄" in flags
+
+
+def test_d3_active_pool_cap_is_six():
+    assert ACTIVE_POOL_CAP == 6

@@ -14,6 +14,11 @@ sys.path.insert(0, str(PROJECT / "src"))
 
 from stock_assistant.akshare_provider import AkshareSinaDailyProvider
 from stock_assistant.strategy_tulong import (
+    ACTIVE_POOL_CAP,
+    RADAR_POOL_CAP,
+    D3CandidateProfile,
+    d3_entry_comfort,
+    d3_pool_subtype,
     estimate_d1_support,
     evaluate_d1_board,
     hhmm_to_int,
@@ -74,6 +79,22 @@ class Pick:
 
 def fmt_yi(x: float) -> str:
     return f"{x / 100000000:.2f}亿"
+
+
+def pick_profile(pick: Pick) -> D3CandidateProfile:
+    return D3CandidateProfile(
+        score=pick.score,
+        trigger_price=pick.trigger,
+        invalid_price=pick.invalid,
+        zone_low=pick.zone_low,
+        zone_high=pick.zone_high,
+        d2_pullback=pick.close_below_high,
+        flags=pick.risk,
+    )
+
+
+def pick_pool_subtype(pick: Pick) -> str:
+    return d3_pool_subtype(pick_profile(pick))
 
 
 def d1_record(row) -> D1Row:
@@ -319,9 +340,11 @@ def main():
     d1_kept.sort(key=lambda r: (-r.d1_score, hhmm_to_int(r.first_seal), r.breaks))
     write_d1_outputs(len(zt), d1_kept, d1_excluded)
 
-    picks.sort(key=lambda p: p.score, reverse=True)
-    selected = picks[:10]
-    narrowed = picks[10:]
+    picks.sort(key=lambda p: (p.score, d3_entry_comfort(pick_profile(p))), reverse=True)
+    active_picks = [p for p in picks if pick_pool_subtype(p) == "active"][:ACTIVE_POOL_CAP]
+    radar_picks = [p for p in picks if pick_pool_subtype(p) == "radar" and p not in active_picks][:RADAR_POOL_CAP]
+    selected = active_picks + radar_picks
+    narrowed = [p for p in picks if p not in selected]
 
     lines = [
         "# 0604D3 新策略完整重筛",
@@ -332,7 +355,7 @@ def main():
         f"- D1涨停池总数：{len(zt)}",
         f"- D1新策略保留：{len(d1_kept)}",
         f"- D2新策略通过：{len(picks)}",
-        f"- 自动输出：{len(selected)}",
+        f"- 自动输出：active {len(active_picks)}，radar {len(radar_picks)}",
         "- 核心偏好：D1主动封板质量；D2量比1-2.5、小实体/十字、冲高回落、低开/平开承接。",
         "",
         "## 观察排序",
@@ -365,16 +388,18 @@ def main():
     REPORT.write_text("\n".join(lines), encoding="utf-8")
 
     with CSV.open("w", newline="", encoding="utf-8") as f:
-        fields = ["code","name","industry","stage","pool_type","source_file","trigger_price","invalid_price","zone_low","zone_high","rank","score","note"]
+        fields = ["code","name","industry","stage","pool_type","pool_subtype","source_file","trigger_price","invalid_price","zone_low","zone_high","rank","score","note"]
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
         for i, p in enumerate(selected, 1):
             r = p.d1
+            psub = pick_pool_subtype(p)
             w.writerow({
                 "code": r.code, "name": r.name, "industry": r.industry, "stage": D3_LABEL, "pool_type": "watch",
+                "pool_subtype": psub,
                 "source_file": CSV.name, "trigger_price": f"{p.trigger:.2f}", "invalid_price": f"{p.invalid:.2f}",
                 "zone_low": f"{p.zone_low:.2f}", "zone_high": f"{p.zone_high:.2f}", "rank": i, "score": f"{p.score:.1f}",
-                "note": f"{D3_LABEL}｜watch｜new_strategy_full｜D1:{r.d1_note}｜D2:{p.rank_reason}" + (f"｜风险:{p.risk}" if p.risk else ""),
+                "note": f"{D3_LABEL}｜watch｜{psub}｜new_strategy_full｜D1:{r.d1_note}｜D2:{p.rank_reason}" + (f"｜风险:{p.risk}" if p.risk else ""),
             })
     print(f"REPORT={REPORT}")
     print(f"CSV={CSV}")

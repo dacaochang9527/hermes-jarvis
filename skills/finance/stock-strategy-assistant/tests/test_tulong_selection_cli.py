@@ -95,6 +95,20 @@ def test_strong_continuation_without_entry_comfort_routes_to_radar():
     assert mod.pool_subtype_for(strong_far) == "radar"
 
 
+def test_strong_continuation_routes_to_radar_even_when_comfortable():
+    mod = load_module()
+    strong_comfortable = candidate(score=88, flags="strong_continuation", zone_low=9.88, zone_high=10.03, d2_pullback=0.06)
+
+    assert mod.pool_subtype_for(strong_comfortable) == "radar"
+
+
+def test_thin_safety_buffer_routes_to_radar():
+    mod = load_module()
+    thin_buffer = candidate(score=88, flags="", trigger_price=10.0, invalid_price=9.7, zone_low=9.92, zone_high=10.03, d2_pullback=0.06)
+
+    assert mod.pool_subtype_for(thin_buffer) == "radar"
+
+
 def test_comfortable_candidate_routes_to_active():
     mod = load_module()
     comfortable = candidate(score=78, flags="", zone_low=9.88, zone_high=10.03, d2_pullback=0.04)
@@ -107,3 +121,9 @@ def test_hard_risk_flags_route_to_radar_even_with_high_score():
     crowded = candidate(score=92, flags="成交拥挤；radar_only", zone_low=9.88, zone_high=10.03, d2_pullback=0.04)
 
     assert mod.pool_subtype_for(crowded) == "radar"
+
+
+def test_active_pool_cap_is_compressed_to_six():
+    mod = load_module()
+
+    assert mod.ACTIVE_POOL_CAP == 6

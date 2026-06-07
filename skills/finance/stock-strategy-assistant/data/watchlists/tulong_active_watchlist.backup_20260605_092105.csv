@@ -1,0 +1,12 @@
+code,name,industry,stage,pool_type,pool_subtype,source_file,trigger_price,invalid_price,zone_low,zone_high,rank,score,note,entry_date,entry_stage,entry_price,quantity,sellable_quantity,cost_amount
+600103,青山纸业,造纸,0605D3,watch,active,0605D3_watch_scan_20260605_081917.csv,3.96,3.70,3.90,3.97,1,100.0,0605D3｜watch｜active｜D1较早封板；D1炸板1次；封板资金较足；D2量比温和1.25；D2回落充分；D2收盘离支撑有安全垫；D2盘中上冲明显；D2收盘近十字；成交额可跟踪；换手适中,,,,,,
+605303,园林股份,基础建设,0605D3,watch,active,0605D3_watch_scan_20260605_081917.csv,29.02,26.91,28.58,29.11,2,92.0,0605D3｜watch｜active｜D1未炸板；D2量比温和1.24；D2有冲高回落；D2收盘离支撑有安全垫；D2收盘近十字；成交额可跟踪；换手适中,,,,,,
+605580,恒盛能源,电力,0605D3,watch,active,0605D3_watch_scan_20260605_081917.csv,28.51,25.71,28.08,28.60,3,83.0,0605D3｜watch｜active｜D1炸板1次；D2量比略高1.47；D2回落充分；D2收盘离支撑有安全垫；D2盘中上冲明显；D2收盘近十字；成交额可跟踪；换手适中,,,,,,
+600679,上海凤凰,摩托车及,0605D3,watch,active,0605D3_watch_scan_20260605_081917.csv,10.83,10.10,10.67,10.86,4,82.0,0605D3｜watch｜active｜D1未炸板；D2量比略高1.60；D2回落充分；D2收盘离支撑有安全垫；D2盘中上冲明显；D2收盘近十字；换手适中,,,,,,
+001326,联域股份,照明设备,0605D3,watch,active,0605D3_watch_scan_20260605_081917.csv,67.62,61.80,66.61,67.82,5,80.0,0605D3｜watch｜active｜D1较早封板；D1炸板2次；D2量比略高1.39；D2回落充分；D2收盘离支撑有安全垫；D2盘中上冲明显；D2收盘近十字；中高价67谨慎；换手适中,,,,,,
+603065,宿迁联盛,化学制品,0605D3,watch,active,0605D3_watch_scan_20260605_081917.csv,8.68,7.65,8.55,8.71,6,77.0,0605D3｜watch｜active｜D1炸板1次；D2量比略高1.62；D2回落充分；D2收盘离支撑有安全垫；D2盘中上冲明显；成交额可跟踪；换手适中,,,,,,
+600505,西昌电力,电力,0605D3,watch,active,0605D3_watch_scan_20260605_081917.csv,14.20,13.04,13.99,14.24,7,77.0,0605D3｜watch｜active｜D1未炸板；D2量比略高1.39；D2回落充分；D2收盘离支撑有安全垫；成交额可跟踪；换手适中,,,,,,
+605018,长华集团,汽车零部,0605D3,watch,active,0605D3_watch_scan_20260605_081917.csv,16.71,14.37,16.46,16.76,8,76.0,0605D3｜watch｜active｜D1炸板2次；D2量比略高1.40；D2强势延续降权，先看可参与性；D2收盘离支撑有安全垫；D2盘中上冲明显；成交额可跟踪；换手适中,,,,,,
+000539,粤电力A,,HOLD,position,hold,data/trades/tulong_trades.csv,9.080,8.354,8.944,9.107,,,HOLD｜from_trades｜entry_stage=0604D3｜quantity=300｜entry_price=9.080,2026-06-04,0604D3,9.080,300,300,2729.03
+002334,英威腾,,HOLD,position,hold,data/trades/tulong_trades.csv,9.470,8.712,9.328,9.498,,,HOLD｜from_trades｜entry_stage=0604D3｜quantity=300｜entry_price=9.470,2026-06-04,0604D3,9.470,300,300,2846.03
+600360,华微电子,,HOLD,position,hold,data/trades/tulong_trades.csv,13.160,12.107,12.963,13.199,,,HOLD｜from_trades｜entry_stage=0604D3｜quantity=300｜entry_price=13.160,2026-06-04,0604D3,13.160,300,300,3953.04

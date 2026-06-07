@@ -15,6 +15,12 @@ sys.path.insert(0, str(PROJECT / "src"))
 
 from stock_assistant.akshare_provider import AkshareSinaDailyProvider  # noqa: E402
 from stock_assistant.strategy_tulong import (  # noqa: E402
+    ACTIVE_POOL_CAP,
+    RADAR_POOL_CAP,
+    D3CandidateProfile,
+    apply_d3_safety_adjustment,
+    d3_entry_comfort,
+    d3_pool_subtype,
     estimate_d1_support,
     evaluate_d1_board,
     hhmm_to_int,
@@ -75,9 +81,6 @@ class Candidate:
     note: str
     flags: str
 
-
-ACTIVE_SCORE_THRESHOLD = 70.0
-RADAR_SCORE_THRESHOLD = 50.0
 
 AUTO_NARROW_EXCLUDE_FLAGS = (
     "高开低走",
@@ -263,43 +266,25 @@ def score_candidate(row, d1, d2, support) -> tuple[float, str, str]:
     return score, "；".join(notes), "；".join(flags)
 
 
-def flag_set(candidate: Candidate) -> set[str]:
-    return {part.strip() for part in str(candidate.flags or "").split("；") if part.strip()}
-
-
-def entry_comfort(candidate: Candidate) -> float:
-    """Estimate D3 executable comfort: higher means closer to a usable zone with clear risk."""
-    if candidate.trigger_price <= 0 or candidate.invalid_price <= 0:
-        return -9.99
-    zone_gap = (candidate.zone_low / candidate.trigger_price) - 1
-    risk_width = (candidate.zone_low / candidate.invalid_price) - 1
-    pullback_bonus = min(candidate.d2_pullback, 0.08)
-    # 买点区应尽量在观察价附近/下方；若买点区已高于观察价，本质更像追高，舒适度强降。
-    executable_gap = -abs(zone_gap) if zone_gap <= 0 else -(zone_gap * 4)
-    return executable_gap + min(risk_width, 0.08) + pullback_bonus
+def candidate_profile(candidate: Candidate) -> D3CandidateProfile:
+    return D3CandidateProfile(
+        score=candidate.score,
+        trigger_price=candidate.trigger_price,
+        invalid_price=candidate.invalid_price,
+        zone_low=candidate.zone_low,
+        zone_high=candidate.zone_high,
+        d2_pullback=candidate.d2_pullback,
+        flags=candidate.flags,
+    )
 
 
 def pool_subtype_for(candidate: Candidate) -> str:
-    flags = flag_set(candidate)
-    comfort = entry_comfort(candidate)
-    strong = "strong_continuation" in flags or "D2高强度" in flags
-    radar_reasons = {"radar_only", "成交拥挤", "高价风险", "尾盘板", "炸板偏多"}
-    if "exclude" in flags:
-        return "exclude"
-    if candidate.score < RADAR_SCORE_THRESHOLD:
-        return "backup"
-    if flags & radar_reasons:
-        return "radar"
-    if strong and (comfort < 0.08 or "回落不足" in flags):
-        return "radar"
-    if candidate.score >= ACTIVE_SCORE_THRESHOLD and comfort >= 0.06:
-        return "active"
-    return "radar"
+    return d3_pool_subtype(candidate_profile(candidate))
 
 
 def auto_narrow_candidates(candidates: list[Candidate], limit: int) -> tuple[list[Candidate], list[Candidate]]:
     """Keep D3 scan outputs current by narrowing every generated candidate set."""
-    ranked = sorted(candidates, key=lambda c: (c.score, entry_comfort(c)), reverse=True)
+    ranked = sorted(candidates, key=lambda c: (c.score, d3_entry_comfort(candidate_profile(c))), reverse=True)
     preferred = [c for c in ranked if pool_subtype_for(c) == "active" and not any(flag in c.flags for flag in AUTO_NARROW_EXCLUDE_FLAGS)]
     fallback = [c for c in ranked if c not in preferred]
     selected = (preferred + fallback)[:limit]
@@ -412,6 +397,7 @@ def generate(args: SelectionArgs) -> OutputPaths:
         if zl > zh:
             rejects.append((code, name, f"观察区倒挂 {zl:.2f}>{zh:.2f}"))
             continue
+        score, note, flags = apply_d3_safety_adjustment(score, note, flags, zl, support)
         raw.append(Candidate(
             code=code, name=name, industry=industry, score=score,
             trigger_price=d2.close, invalid_price=support, zone_low=zl, zone_high=zh,
@@ -428,13 +414,13 @@ def generate(args: SelectionArgs) -> OutputPaths:
     raw.sort(key=lambda c: c.score, reverse=True)
     selected, narrowed_out = auto_narrow_candidates(raw, args.max_candidates + 10)
 
-    active_count = min(8, args.max_candidates)
+    active_count = min(ACTIVE_POOL_CAP, args.max_candidates)
     active_candidates = [c for c in selected if pool_subtype_for(c) == "active"][:active_count]
-    radar_candidates = [c for c in selected if pool_subtype_for(c) == "radar" and c not in active_candidates][:6]
+    radar_candidates = [c for c in selected if pool_subtype_for(c) == "radar" and c not in active_candidates][:RADAR_POOL_CAP]
     extra_radar = [c for c in narrowed_out if pool_subtype_for(c) == "radar"
-                   and c not in active_candidates and c not in radar_candidates][:6 - len(radar_candidates)]
+                   and c not in active_candidates and c not in radar_candidates][:RADAR_POOL_CAP - len(radar_candidates)]
     radar_candidates.extend(extra_radar)
-    all_candidates = active_candidates + radar_candidates[:6]
+    all_candidates = active_candidates + radar_candidates[:RADAR_POOL_CAP]
     narrowed_out = [c for c in (selected + narrowed_out) if c not in all_candidates]
     report_candidates = all_candidates[:args.max_report]
 

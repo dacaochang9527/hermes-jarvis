@@ -75,7 +75,7 @@ references/tulong-trade-screenshot-entry.md
 
 - 屠龙相关问题直接从本 skill 主入口分流到 `references/tulong-current-rules.md` / `references/tulong-operations.md`；不要先尝试旧名或子技能名 `tulong-tactics`，该入口在部分会话中不可见。
 - 屠龙盘中提醒的事件分层、状态去重、飞书全量输出和验证口径见 `references/tulong-monitoring-discipline.md`。
-- 当用户问“改完了吗 / 做了吗”时，必须区分“建议/判断”与“已落地并验证”。如果只是给过优化建议，不要暗示已经完成；应立即实现、运行验证，并说明验证结果。
+- 当用户在复盘后说“优先做 N 条 / 先做前三条 / active 池压缩”等短指令时，默认是批准落地最近复盘或当前报告中的对应规则修订候选；应先回溯当前会话/最近报告定位编号含义，然后直接按规则变更同步协议修改规则、selection/runtime（如涉及）、文档和测试，不要只复述建议或要求用户重新解释。
 - 盘中监控和提醒优化属于运行流程变更：除了改脚本，也要同步 `references/tulong-operations.md`，并至少跑 `py_compile` 与一次 `FORCE_RUN=1` 验证用户可见输出。
 
 ## 标准规则与朋友规则边界
@@ -96,7 +96,7 @@ references/tulong-trade-screenshot-entry.md
 - `references/` 只保留未来会话应主动加载的当前事实源；当用户反馈 skill 太乱、reference 太散或职责模糊时，先压缩入口、合并到现有 class-level reference，删除旧底稿/一次性笔记，而不是继续新增平级 reference。
 - `scripts/tulong/README.md` 只维护脚本目录、入口和 wrapper 映射；运行流程、active 池来源、HOLD 派生、cron、watchdog、日志、排障纪律、脚本目录和架构职责边界统一维护在 `references/tulong-operations.md`，不要两边重复保存同一事实。
 - 从 README 或其他局部文档移除跨层职责说明时，不要直接删除语义；先迁移到对应的 class-level reference（屠龙运行/架构职责默认进 `references/tulong-operations.md`），再在局部文档保留轻量索引或跳转。
-- 修改屠龙策略规则时，把 `references/tulong-current-rules.md` 视为上游策略事实源，但必须按其中“规则变更同步协议”评估并同步 `src/stock_assistant/strategy_tulong.py`、`scripts/tulong/selection/`、`scripts/tulong/runtime/`、`references/tulong-operations.md` 和 tests；不要只改规则文档，也不要只做文档位置一致性检查。
+- 修改屠龙策略规则时，把 `references/tulong-current-rules.md` 视为上游策略事实源，但必须按其中“规则变更同步协议”评估并同步 `src/stock_assistant/strategy_tulong.py`、`scripts/tulong/selection/`、`scripts/tulong/runtime/`、`references/tulong-operations.md` 和 tests；不要只改规则文档，也不要只做文档位置一致性检查。对 D3 分层/容量/安全垫/active-radar 这类会影响是否进入监控池的核心规则，优先下沉到 `src/stock_assistant/strategy_tulong.py` 的共享函数/常量，再让所有 selection 入口（包括外部策略对照脚本）调用同一套 `D3CandidateProfile` / `d3_pool_subtype` / 容量常量；不要只在某个生成器里局部实现，也不要用 `picks[:N]` 这类绕过 `pool_subtype` 的截断。
 - 对文档分层、职责迁移或规则同步机制做维护时，优先增加/更新轻量 pytest 守门测试，防止职责说明回流到局部 README、规则协议丢失、或 selection 脱离可复用规则模块。
 - 单日复盘、迁移记录、旧策略底稿和一次性问题笔记不要新增为平级 reference；阶段性结论优先放到 `reports/reviews/`，只在当前 reference 中保留必要索引。
 - 持仓事实源变更要同步三层：`references/tulong-current-rules.md`、`references/tulong-operations.md`、以及 `scripts/tulong/runtime/` 实际运行脚本和对应测试；不要只改文档。当前 HOLD 从 `data/trades/tulong_trades.csv` 的 buy/sell 流水派生 open position，不再维护独立 `HOLD_position_*` 源文件。

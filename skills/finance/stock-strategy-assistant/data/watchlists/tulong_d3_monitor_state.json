@@ -1,55 +1,33 @@
 {
-  "last_prices": {
-    "000586": 16.68,
-    "600360": 13.71,
-    "603997": 15.19,
-    "000960": 41.82,
-    "002876": 31.92,
-    "600345": 54.22,
-    "600362": 46.05,
-    "002314": 2.5,
-    "600114": 39.55,
-    "600459": 24.23,
-    "000539": 9.17,
-    "001269": 27.52,
-    "002421": 4.74,
-    "600160": 38.3,
-    "600596": 14.34
-  },
+  "sent": {},
+  "last_prices": {},
   "pending_snapshot": null,
-  "last_event_run_at": "2026-06-04T14:59:41",
+  "last_event_run_at": null,
   "watchlist_source": [
-    "0604D3_new_strategy_full_watch_scan_20260604_015049.csv",
+    "0605D3_negative_adjusted_watch_scan_20260605_092000.csv",
     "data/trades/tulong_trades.csv"
   ],
-  "watch_date": "2026-06-04",
+  "watch_date": "2026-06-05",
   "stages": [
-    "0604D3",
+    "0605D3",
     "HOLD"
   ],
   "pool_types": [
     "position",
     "watch"
   ],
-  "updated_at": "2026-06-04T09:13:14",
-  "filtered_out": [],
-  "pending_alerts": [],
-  "last_alert_flush_at": "2026-06-04T14:55:38",
-  "alert_statuses": {
-    "000586": "observe",
-    "600360": "observe",
-    "603997": "entry_zone",
-    "000960": "underwater",
-    "002876": "observe",
-    "600345": "observe",
-    "600362": "underwater",
-    "002314": "entry_zone",
-    "600114": "observe",
-    "600459": "entry_zone",
-    "000539": "profit_take",
-    "001269": "profit_take",
-    "002421": "cost_loss",
-    "600160": "cost_loss",
-    "600596": "observe"
-  }
+  "updated_at": "2026-06-05T17:20:50",
+  "filtered_out": [
+    "002046 国机精工 pool_subtype=radar_not_rotated",
+    "600078 澄星股份 pool_subtype=radar_not_rotated",
+    "600439 瑞贝卡 pool_subtype=radar_not_rotated",
+    "603135 中重科技 pool_subtype=radar_not_rotated",
+    "001326 联域股份 pool_subtype=exclude_not_rotated",
+    "603065 宿迁联盛 pool_subtype=exclude_not_rotated",
+    "605580 恒盛能源 pool_subtype=exclude_not_rotated",
+    "605018 长华集团 pool_subtype=exclude_not_rotated",
+    "605303 园林股份 pool_subtype=exclude_not_rotated",
+    "605162 新中港 pool_subtype=exclude_not_rotated",
+    "600578 京能电力 pool_subtype=exclude_not_rotated"
+  ]
 }

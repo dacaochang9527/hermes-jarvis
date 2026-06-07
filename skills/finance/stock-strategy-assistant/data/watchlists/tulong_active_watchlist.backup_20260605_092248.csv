@@ -1,0 +1,4 @@
+code,name,industry,stage,pool_type,pool_subtype,source_file,trigger_price,invalid_price,zone_low,zone_high,rank,score,note,entry_date,entry_stage,entry_price,quantity,sellable_quantity,cost_amount
+000539,粤电力A,,HOLD,position,hold,data/trades/tulong_trades.csv,9.080,8.354,8.944,9.107,,,HOLD｜from_trades｜entry_stage=0604D3｜quantity=300｜entry_price=9.080,2026-06-04,0604D3,9.080,300,300,2729.03
+002334,英威腾,,HOLD,position,hold,data/trades/tulong_trades.csv,9.470,8.712,9.328,9.498,,,HOLD｜from_trades｜entry_stage=0604D3｜quantity=300｜entry_price=9.470,2026-06-04,0604D3,9.470,300,300,2846.03
+600360,华微电子,,HOLD,position,hold,data/trades/tulong_trades.csv,13.160,12.107,12.963,13.199,,,HOLD｜from_trades｜entry_stage=0604D3｜quantity=300｜entry_price=13.160,2026-06-04,0604D3,13.160,300,300,3953.04

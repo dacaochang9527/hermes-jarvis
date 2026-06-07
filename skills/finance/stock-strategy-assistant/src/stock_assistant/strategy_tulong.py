@@ -7,12 +7,28 @@ from .models import DailyBar, StrategySignal
 
 MAIN_BOARD_10CM_PREFIXES = ("600", "601", "603", "605", "000", "001", "002", "003")
 EXCLUDED_NAME_PARTS = ("ST", "*ST", "退")
+ACTIVE_SCORE_THRESHOLD = 70.0
+RADAR_SCORE_THRESHOLD = 50.0
+ACTIVE_POOL_CAP = 6
+RADAR_POOL_CAP = 6
+MIN_ACTIVE_SAFETY_BUFFER = 0.025
 
 
 @dataclass(frozen=True)
 class D1Evaluation:
     passed: bool
     reject_reason: str = ""
+
+
+@dataclass(frozen=True)
+class D3CandidateProfile:
+    score: float
+    trigger_price: float
+    invalid_price: float
+    zone_low: float
+    zone_high: float
+    d2_pullback: float = 0.0
+    flags: str = ""
 
 
 def safe_float(value, default: float = 0.0) -> float:
@@ -22,6 +38,73 @@ def safe_float(value, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def flag_set(flags: str) -> set[str]:
+    return {part.strip() for part in str(flags or "").split("；") if part.strip()}
+
+
+def join_flags(*parts: str) -> str:
+    seen: list[str] = []
+    for text in parts:
+        for part in str(text or "").split("；"):
+            item = part.strip()
+            if item and item not in seen:
+                seen.append(item)
+    return "；".join(seen)
+
+
+def d3_entry_comfort(candidate: D3CandidateProfile) -> float:
+    if candidate.trigger_price <= 0 or candidate.invalid_price <= 0:
+        return -9.99
+    zone_gap = (candidate.zone_low / candidate.trigger_price) - 1
+    risk_width = (candidate.zone_low / candidate.invalid_price) - 1
+    pullback_bonus = min(candidate.d2_pullback, 0.08)
+    executable_gap = -abs(zone_gap) if zone_gap <= 0 else -(zone_gap * 4)
+    return executable_gap + min(risk_width, 0.08) + pullback_bonus
+
+
+def d3_safety_buffer(candidate: D3CandidateProfile) -> float:
+    if candidate.zone_low <= 0 or candidate.invalid_price <= 0:
+        return -9.99
+    return (candidate.zone_low / candidate.invalid_price) - 1
+
+
+def d3_pool_subtype(candidate: D3CandidateProfile) -> str:
+    flags = flag_set(candidate.flags)
+    comfort = d3_entry_comfort(candidate)
+    strong = "strong_continuation" in flags or "D2高强度" in flags or "强延续高风险" in flags
+    radar_reasons = {"radar_only", "成交拥挤", "高价风险", "尾盘板", "炸板偏多"}
+    if "exclude" in flags:
+        return "exclude"
+    if candidate.score < RADAR_SCORE_THRESHOLD:
+        return "backup"
+    if flags & radar_reasons:
+        return "radar"
+    if d3_safety_buffer(candidate) < MIN_ACTIVE_SAFETY_BUFFER:
+        return "radar"
+    if strong:
+        return "radar"
+    if candidate.score >= ACTIVE_SCORE_THRESHOLD and comfort >= 0.06:
+        return "active"
+    return "radar"
+
+
+def apply_d3_safety_adjustment(score: float, note: str, flags: str, zone_low: float, invalid_price: float) -> tuple[float, str, str]:
+    buffer = (zone_low / invalid_price - 1) if invalid_price else 0
+    if buffer < 0.02:
+        return (
+            score - 12,
+            join_flags(note, f"买点区距失效线仅{buffer*100:.1f}%，只能快判/备选"),
+            join_flags(flags, "安全垫薄", "radar_only"),
+        )
+    if buffer < MIN_ACTIVE_SAFETY_BUFFER:
+        return (
+            score - 8,
+            join_flags(note, f"买点区距失效线{buffer*100:.1f}%偏薄，不进active"),
+            join_flags(flags, "安全垫薄"),
+        )
+    return score, note, flags
 
 
 def hhmm_to_int(value) -> int:

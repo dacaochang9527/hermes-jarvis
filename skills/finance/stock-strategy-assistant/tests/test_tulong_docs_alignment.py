@@ -90,5 +90,16 @@ def test_documented_architecture_paths_exist():
 
 def test_selection_entry_uses_reusable_strategy_module():
     selection = read_text("scripts/tulong/selection/generate_d3_candidates.py")
+    external = read_text("scripts/tulong/selection/generate_0604_new_strategy_full_scan.py")
 
     assert "from stock_assistant.strategy_tulong import" in selection
+    assert "D3CandidateProfile" in selection
+    assert "d3_pool_subtype" in selection
+    assert "apply_d3_safety_adjustment" in selection
+    assert "ACTIVE_SCORE_THRESHOLD =" not in selection
+    assert "MIN_ACTIVE_SAFETY_BUFFER =" not in selection
+
+    assert "from stock_assistant.strategy_tulong import" in external
+    assert "D3CandidateProfile" in external
+    assert "d3_pool_subtype" in external
+    assert '"pool_subtype"' in external
