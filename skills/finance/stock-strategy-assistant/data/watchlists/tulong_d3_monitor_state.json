@@ -4,30 +4,26 @@
   "pending_snapshot": null,
   "last_event_run_at": null,
   "watchlist_source": [
-    "0605D3_negative_adjusted_watch_scan_20260605_092000.csv",
+    "0609D3_watch_scan_20260609_010920.csv",
     "data/trades/tulong_trades.csv"
   ],
-  "watch_date": "2026-06-05",
+  "watch_date": "2026-06-09",
   "stages": [
-    "0605D3",
+    "0609D3",
     "HOLD"
   ],
   "pool_types": [
     "position",
     "watch"
   ],
-  "updated_at": "2026-06-05T17:20:50",
+  "updated_at": "2026-06-09T21:09:07",
   "filtered_out": [
-    "002046 国机精工 pool_subtype=radar_not_rotated",
-    "600078 澄星股份 pool_subtype=radar_not_rotated",
-    "600439 瑞贝卡 pool_subtype=radar_not_rotated",
-    "603135 中重科技 pool_subtype=radar_not_rotated",
-    "001326 联域股份 pool_subtype=exclude_not_rotated",
-    "603065 宿迁联盛 pool_subtype=exclude_not_rotated",
-    "605580 恒盛能源 pool_subtype=exclude_not_rotated",
-    "605018 长华集团 pool_subtype=exclude_not_rotated",
-    "605303 园林股份 pool_subtype=exclude_not_rotated",
-    "605162 新中港 pool_subtype=exclude_not_rotated",
-    "600578 京能电力 pool_subtype=exclude_not_rotated"
+    "002251 步步高 pool_subtype=radar_not_rotated",
+    "000759 中百集团 pool_subtype=radar_not_rotated",
+    "000668 荣丰控股 pool_subtype=radar_not_rotated",
+    "000517 荣安地产 pool_subtype=radar_not_rotated",
+    "002631 德尔未来 pool_subtype=radar_not_rotated",
+    "002471 中超控股 pool_subtype=radar_not_rotated",
+    "603270 金帝股份 duplicated_as_HOLD_from_trades"
   ]
 }

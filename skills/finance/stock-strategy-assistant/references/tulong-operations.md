@@ -130,6 +130,8 @@ MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv
 
 ## 监控池查询纪律
 
+当用户在生成 D3 列表后说“发到飞书 / 发我飞书 / 同步到飞书”时，直接用 `send_message(target="feishu")` 发到飞书 home channel，不要再问目标；消息应包含生成口径、watch CSV 路径、报告路径、active/radar 数量和分层清单。CSV/报告文件路径用纯文本写出即可，不要用 `MEDIA:` 附件标签；飞书收到的是摘要，完整文件仍以本机路径为准。
+
 当用户问“今天监控池有哪些 / 是否正常 / 先忽略 HOLD”时，必须区分 D3 watch 与 HOLD position：
 
 - 只问 D3 且用户明确“先忽略 HOLD”时，先读最新 `MMDDD3_watch_*_YYYYMMDD_HHMMSS.csv` 区分 active/radar，再读 active 中实际已切入的 `stage=MMDDD3,pool_type=watch,pool_subtype=active` 行；
@@ -140,6 +142,8 @@ MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv
 ## 收盘复盘归因
 
 `runtime/review.py` 输出交易归因时固定分为：D3 active交易、D3 radar观察但未买、HOLD管理、策略外交易、ETF。D3 当日策略表现只看 active 主池内交易；HOLD/T、策略外交易、ETF 不混入当日 D3 胜率。
+
+盘后若用户先补录交易截图、再要求复盘，注意 `tulong_active_watchlist.csv` 可能已经被 `preopen_rotate_watchlist.py --force` 重切：已买入的当日 D3 票会转成 HOLD，已清仓旧 HOLD 会退出 active。复盘归因不能直接用重切后的 active CSV 判断原始 active/radar；必须先读取当日最新原始 `MMDDD3*_watch*_YYYYMMDD_HHMMSS.csv`，用其中 `pool_subtype=active/radar` 归因今日交易，再单独从 `data/trades/tulong_trades.csv` 汇总当前 HOLD。
 
 ## 排障顺序
 

@@ -1,0 +1,7 @@
+code,name,industry,stage,pool_type,pool_subtype,source_file,trigger_price,invalid_price,zone_low,zone_high,rank,score,note,entry_date,entry_stage,entry_price,quantity,sellable_quantity,cost_amount
+000670,盈方微,其他电子,0608D3,watch,active,0608D3_negative_adjusted_watch_scan_20260608_005741.csv,9.42,8.79,9.28,9.45,4,89.0,0608D3｜watch｜active｜D1较早封板；D1未炸板；封板资金较足；D2量比略高1.41；D2有冲高回落；D2收盘离支撑有安全垫；成交额可跟踪；换手适中；消息面复核：原active->active；周末重组进展/关联交易进展，有催化但需开盘承接验证；未见减持冻结硬伤,,,,,,
+603610,麒盛科技,家居用品,0608D3,watch,active,0608D3_negative_adjusted_watch_scan_20260608_005741.csv,18.82,17.56,18.54,18.88,6,88.0,0608D3｜watch｜active｜D1较早封板；D1炸板1次；D2量比略高1.37；D2回落充分；D2收盘离支撑有安全垫；D2盘中上冲明显；D2收盘近十字；成交额可跟踪；换手适中；消息面复核：原active->active；消息面相对干净；原 active 结构仍成立,,,,,,
+000539,粤电力A,,HOLD,position,hold,data/trades/tulong_trades.csv,9.080,8.354,8.944,9.107,,,HOLD｜from_trades｜entry_stage=0604D3｜quantity=300｜entry_price=9.080,2026-06-04,0604D3,9.080,300,300,2729.03
+002735,王子新材,,HOLD,position,hold,data/trades/tulong_trades.csv,17.470,16.072,17.208,17.522,,,HOLD｜from_trades｜entry_stage=0605D3｜quantity=200｜entry_price=17.470,2026-06-05,0605D3,17.470,200,200,3499.00
+600103,青山纸业,,HOLD,position,hold,data/trades/tulong_trades.csv,3.950,3.634,3.891,3.962,,,HOLD｜from_trades｜entry_stage=0605D3｜quantity=900｜entry_price=3.950,2026-06-05,0605D3,3.950,900,900,3560.04
+600679,上海凤凰,,HOLD,position,hold,data/trades/tulong_trades.csv,11.070,10.184,10.904,11.103,,,HOLD｜from_trades｜entry_stage=0605D3｜quantity=300｜entry_price=11.070,2026-06-05,0605D3,11.070,300,300,3326.03

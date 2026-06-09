@@ -112,10 +112,22 @@ D2 高强度延续不能自动等同于进入 active。D2 涨停/接近涨停但
 当用户要求按“减持/负面消息/公告风险”调整 D3 股票列表时，处理为消息面复核后的二次分层，不直接补入规则外股票：
 
 1. 对当前 D3 watch 的 active/radar 全量标的查询近 1–3 个月公告/新闻，重点关键词包括：减持、拟减持、持股变动、权益变动、协议转让、质押、冻结、解禁、立案、处罚、监管、问询、诉讼、股票交易风险提示、异常波动、亏损。
-2. 明确减持/拟减持、实控人或高管减持计划，默认从 active 降到 exclude；控股股东/实控人协议转让属于类减持/筹码变化，至少降级，严重时 exclude。
-3. 股权质押、密集风险提示、估值/亏损风险、被动稀释等不等同于减持，但应按严重程度降到 radar 或 exclude；普通异常波动且公告确认无应披露未披露重大信息，可保留 radar 低频观察。
-4. 调整版文件名可使用 `MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv`，保留 `pool_subtype=active/radar/exclude`，并在 note 中写明公告复核原因与原分层。
-5. 若调整版要切入正式监控，active 只保留消息面相对干净且原结构仍成立的少数标的；radar/exclude 不进入正式 active 监控池。
+2. 先按原 `pool_subtype=active/radar` 输出消息面证据，再给“消息面二次分层”建议，避免把原结构风险和公告风险混在一起。
+3. 明确减持/拟减持、实控人或高管减持计划，默认从 active 降到 exclude；控股股东/实控人协议转让属于类减持/筹码变化，至少降级，严重时 exclude。
+4. 股权质押、冻结、司法拍卖/处置、密集风险提示、估值/亏损风险、被动稀释、监管函或警示函等不等同于减持，但应按严重程度降到 radar 或 exclude；普通异常波动且公告确认无应披露未披露重大信息，可保留 radar 低频观察。
+5. 用户只问“最近有什么消息面信息”时，先回答证据与分层建议，不默认落盘调整版或切入正式监控；只有用户要求调整/切池时才生成 `MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv` 并继续运行 preopen rotate。
+6. 调整版文件名可使用 `MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv`，保留 `pool_subtype=active/radar/exclude`，并在 note 中写明公告复核原因与原分层。
+7. 若调整版要切入正式监控，active 只保留消息面相对干净且原结构仍成立的少数标的；radar/exclude 不进入正式 active 监控池。
+
+消息面复核输出建议：
+
+```text
+active 中消息面风险较重 / active 中相对干净
+radar 中相对干净 / radar 中风险偏重
+每只票：日期 + 公告/新闻标题 + 风险类型 + 对分层的影响
+```
+
+优先使用公告源，新闻只做补充线索。若某个公告接口返回字段异常或空结果，换用可用公告/新闻源继续交叉验证；不要把接口临时字段问题固化成长期限制。
 
 复核清单：
 
@@ -157,6 +169,8 @@ ETF                 # ETF/基金单独统计，不进入屠龙 D3 胜率
 ```
 
 D3 策略表现只统计当日 active 主池内交易，不把 HOLD/T、策略外交易或 ETF 混入当日 D3 胜率。
+
+复盘归因必须以当日原始 `MMDDD3*_watch*_YYYYMMDD_HHMMSS.csv` 的 `pool_subtype` 为准，而不是直接用当前 `tulong_active_watchlist.csv`。原因：用户盘后补录交易后，`preopen_rotate_watchlist.py --force` 可能把当日买入票转成 HOLD、把清仓票移除；若复盘脚本此时只读当前 active CSV，会把原始 active/radar 归因改写，导致 D3 active 胜率失真。处理顺序：先定位当日最新原始 watch 文件，按其中 active/radar 做交易归因；再单独用交易流水汇总当前 HOLD。
 
 ## HOLD 持仓事实层
 
