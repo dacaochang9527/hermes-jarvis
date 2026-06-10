@@ -1,29 +1,44 @@
 {
-  "sent": {},
-  "last_prices": {},
+  "last_prices": {
+    "001317": 58.1,
+    "000725": 6.04,
+    "002460": 67.6,
+    "002631": 7.84,
+    "601991": 7.76,
+    "603270": 30.06
+  },
   "pending_snapshot": null,
-  "last_event_run_at": null,
+  "last_event_run_at": "2026-06-10T14:59:13",
   "watchlist_source": [
-    "0609D3_watch_scan_20260609_010920.csv",
+    "0610D3_watch_scan_20260609_235208.csv",
     "data/trades/tulong_trades.csv"
   ],
-  "watch_date": "2026-06-09",
+  "watch_date": "2026-06-10",
   "stages": [
-    "0609D3",
+    "0610D3",
     "HOLD"
   ],
   "pool_types": [
     "position",
     "watch"
   ],
-  "updated_at": "2026-06-09T21:09:07",
+  "updated_at": "2026-06-10T08:50:45",
   "filtered_out": [
-    "002251 步步高 pool_subtype=radar_not_rotated",
-    "000759 中百集团 pool_subtype=radar_not_rotated",
-    "000668 荣丰控股 pool_subtype=radar_not_rotated",
-    "000517 荣安地产 pool_subtype=radar_not_rotated",
-    "002631 德尔未来 pool_subtype=radar_not_rotated",
-    "002471 中超控股 pool_subtype=radar_not_rotated",
-    "603270 金帝股份 duplicated_as_HOLD_from_trades"
-  ]
+    "001696 宗申动力 pool_subtype=radar_not_rotated",
+    "603616 韩建河山 pool_subtype=radar_not_rotated",
+    "002362 汉王科技 pool_subtype=radar_not_rotated",
+    "603778 国晟科技 pool_subtype=radar_not_rotated",
+    "002164 宁波东力 pool_subtype=radar_not_rotated",
+    "002636 金安国纪 pool_subtype=radar_not_rotated"
+  ],
+  "alert_statuses": {
+    "001317": "observe",
+    "000725": "near_invalid",
+    "002460": "observe",
+    "002631": "cost_loss",
+    "601991": "observe",
+    "603270": "observe"
+  },
+  "pending_alerts": [],
+  "last_alert_flush_at": "2026-06-10T14:55:11"
 }
