@@ -1,0 +1,93 @@
+target:
+  tournament: World Cup 2026
+  match_type: national_team
+  prediction_markets:
+    - 1x2
+    - over_under_2_5
+    - betting_value
+
+training_scope:
+  time_window:
+    start_date: '2014-06-12'
+    end_policy: before_prediction_kickoff
+    description: 'Use the last three World Cup cycles: 2014 World Cup onward through data available before each predicted match.'
+  include_competitions:
+    world_cup_finals:
+      weight: 1.25
+      aliases:
+        - FIFA World Cup
+        - World Cup finals
+        - World Cup
+    world_cup_qualifiers:
+      weight: 1.0
+      aliases:
+        - FIFA World Cup qualification
+        - World Cup Qualifier
+        - World Cup qualifiers
+  exclude_competitions:
+    - Continental finals
+    - Continental qualifiers
+    - UEFA Nations League
+    - CONCACAF Nations League
+    - Friendly
+    - International Friendly
+    - Olympic Games
+    - U23
+
+model_route:
+  strength_layer: elo
+  goal_layer: poisson_dixon_coles
+  post_calibration_layer: probability_shrinkage
+  value_layer: market_implied_probability
+  signal_layer: betting_discipline
+  odds_policy: reference_required_for_value
+
+calibration:
+  selected_at: current
+  objective: 0.7 * log_loss_1x2 + 0.3 * log_loss_ou25
+  parameters:
+    league_avg: 1.35
+    home_advantage: 1.12
+    dixon_coles_rho: -0.04
+    ou_base_rate: 0.45
+    ou_shrinkage: 0.45
+    min_training_matches: 300
+  backtest:
+    matches: 2514
+    accuracy_1x2: 0.586
+    accuracy_ou25: 0.562
+    log_loss_1x2: 0.8956
+    log_loss_ou25: 0.6805
+    ece_1x2: 0.047
+    ece_ou25: 0.057
+    score: 0.8311
+  reports:
+    results_csv: reports/calibration_results.csv
+    best_json: reports/calibration_best.json
+
+betting_discipline:
+  one_x_two:
+    primary_signal: true
+    grade_a:
+      min_edge: 0.08
+      min_model_probability: 0.35
+      action: 可下注
+    grade_b:
+      min_edge: 0.05
+      min_model_probability: 0.30
+      action: 小注/观察
+    grade_c:
+      min_edge: 0.03
+      action: 仅观察
+    no_bet:
+      action: 放弃
+  over_under_2_5:
+    role: secondary_signal_only
+    strong_lean_probability: 0.68
+    lean_probability: 0.60
+    standalone_betting: false
+
+notes:
+  - Use only data available before kickoff.
+  - World Cup finals are usually neutral except host matches.
+  - Rankings may initialize or regularize Elo, but should not replace match-history performance.

@@ -1,0 +1,12 @@
+{
+  "league_avg": 1.25,
+  "home_adv": 1.03,
+  "rho": -0.08,
+  "min_training_matches": 100,
+  "matches": 2714,
+  "accuracy_1x2": 0.5733235077376566,
+  "accuracy_ou25": 0.5563743551952837,
+  "log_loss_1x2": 0.9228949885855606,
+  "log_loss_ou25": 0.6948840137476721,
+  "score": 0.854491696134194
+}

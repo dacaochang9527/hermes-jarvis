@@ -1,0 +1,118 @@
+{
+  "Argentina": {
+    "attack": 0.967,
+    "defense": 0.0
+  },
+  "Belgium": {
+    "attack": 1.0,
+    "defense": 1.0
+  },
+  "Brazil": {
+    "attack": 1.0,
+    "defense": 0.732
+  },
+  "Canada": {
+    "attack": 0.77,
+    "defense": 1.0
+  },
+  "China PR": {
+    "attack": 1.0,
+    "defense": 1.0
+  },
+  "Costa Rica": {
+    "attack": 0.0,
+    "defense": 1.547
+  },
+  "Côte d'Ivoire": {
+    "attack": 1.099,
+    "defense": 0.912
+  },
+  "Egypt": {
+    "attack": 1.112,
+    "defense": 1.87
+  },
+  "El Salvador": {
+    "attack": 0.0,
+    "defense": 0.623
+  },
+  "England": {
+    "attack": 1.155,
+    "defense": 1.075
+  },
+  "France": {
+    "attack": 1.049,
+    "defense": 0.956
+  },
+  "Germany": {
+    "attack": 0.956,
+    "defense": 1.049
+  },
+  "Honduras": {
+    "attack": 1.0,
+    "defense": 1.464
+  },
+  "Iraq": {
+    "attack": 1.329,
+    "defense": 0.935
+  },
+  "Japan": {
+    "attack": 1.87,
+    "defense": 1.433
+  },
+  "Mexico": {
+    "attack": 1.0,
+    "defense": 1.0
+  },
+  "Nigeria": {
+    "attack": 1.0,
+    "defense": 1.0
+  },
+  "Panama": {
+    "attack": 0.0,
+    "defense": 0.0
+  },
+  "Portugal": {
+    "attack": 1.0,
+    "defense": 1.0
+  },
+  "Republic of Ireland": {
+    "attack": 2.0,
+    "defense": 0.773
+  },
+  "Saudi Arabia": {
+    "attack": 1.0,
+    "defense": 1.0
+  },
+  "Senegal": {
+    "attack": 1.0,
+    "defense": 1.0
+  },
+  "Serbia": {
+    "attack": 2.0,
+    "defense": 1.429
+  },
+  "Singapore": {
+    "attack": 1.0,
+    "defense": 1.0
+  },
+  "South Africa": {
+    "attack": 0.0,
+    "defense": 0.571
+  },
+  "South Korea": {
+    "attack": 1.5,
+    "defense": 2.0
+  },
+  "Spain": {
+    "attack": 1.333,
+    "defense": 0.516
+  },
+  "Tunisia": {
+    "attack": 1.0,
+    "defense": 1.0
+  },
+  "USA": {
+    "attack": 0.912,
+    "defense": 1.099
+  }
+}
