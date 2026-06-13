@@ -1,44 +1,63 @@
 {
   "last_prices": {
-    "001317": 58.1,
-    "000725": 6.04,
-    "002460": 67.6,
-    "002631": 7.84,
-    "601991": 7.76,
-    "603270": 30.06
+    "603661": 35.5,
+    "000558": 4.01,
+    "002256": 4.15,
+    "600981": 2.75,
+    "002240": 51.08,
+    "003026": 33.18
   },
   "pending_snapshot": null,
-  "last_event_run_at": "2026-06-10T14:59:13",
+  "last_event_run_at": "2026-06-12T14:59:30",
   "watchlist_source": [
-    "0610D3_watch_scan_20260609_235208.csv",
+    "0612D3_watch_scan_20260611_233915.csv",
     "data/trades/tulong_trades.csv"
   ],
-  "watch_date": "2026-06-10",
+  "watch_date": "2026-06-12",
   "stages": [
-    "0610D3",
+    "0612D3",
     "HOLD"
   ],
   "pool_types": [
     "position",
     "watch"
   ],
-  "updated_at": "2026-06-10T08:50:45",
+  "updated_at": "2026-06-12T08:50:04",
   "filtered_out": [
-    "001696 宗申动力 pool_subtype=radar_not_rotated",
-    "603616 韩建河山 pool_subtype=radar_not_rotated",
-    "002362 汉王科技 pool_subtype=radar_not_rotated",
-    "603778 国晟科技 pool_subtype=radar_not_rotated",
-    "002164 宁波东力 pool_subtype=radar_not_rotated",
-    "002636 金安国纪 pool_subtype=radar_not_rotated"
+    "002125 湘潭电化 pool_subtype=radar_not_rotated",
+    "002119 康强电子 pool_subtype=radar_not_rotated",
+    "600178 东安动力 pool_subtype=radar_not_rotated",
+    "603687 大胜达 pool_subtype=radar_not_rotated",
+    "603375 盛景微 pool_subtype=radar_not_rotated",
+    "600665 天地源 pool_subtype=radar_not_rotated"
   ],
   "alert_statuses": {
-    "001317": "observe",
-    "000725": "near_invalid",
-    "002460": "observe",
-    "002631": "cost_loss",
-    "601991": "observe",
-    "603270": "observe"
+    "603661": "underwater",
+    "000558": "observe",
+    "002256": "entry_zone",
+    "600981": "entry_zone",
+    "002240": "observe",
+    "003026": "invalid"
   },
-  "pending_alerts": [],
-  "last_alert_flush_at": "2026-06-10T14:55:11"
+  "pending_alerts": [
+    {
+      "event": "entry_zone",
+      "tier": "A",
+      "stage": "0612D3",
+      "code": "600981",
+      "name": "苏豪汇鸿",
+      "industry": "贸易Ⅱ",
+      "price": 2.74,
+      "pct": -1.4388489208632893,
+      "zone_low": 2.74,
+      "zone_high": 2.79,
+      "invalid": 2.46,
+      "trigger": 2.78,
+      "stop_distance": 0.11382113821138229,
+      "amount": 167175571.0,
+      "hhmm": "14:56",
+      "queued_at": "2026-06-12T14:56:29"
+    }
+  ],
+  "last_alert_flush_at": "2026-06-12T14:55:28"
 }

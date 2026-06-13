@@ -1,7 +1,7 @@
 code,name,industry,stage,pool_type,pool_subtype,source_file,trigger_price,invalid_price,zone_low,zone_high,rank,score,note,entry_date,entry_stage,entry_price,quantity,sellable_quantity,cost_amount
-001317,三羊马,铁路公路,0610D3,watch,active,0610D3_watch_scan_20260609_235208.csv,57.36,51.69,56.50,57.53,1,89.0,0610D3｜watch｜active｜D1未炸板；封板资金较足；D2量比略高1.63；D2回落充分；D2收盘离支撑有安全垫；D2盘中上冲明显；D2收盘近十字；中高价57谨慎；成交额可跟踪；换手适中,,,,,,
-000725,京东方A,,HOLD,position,hold,data/trades/tulong_trades.csv,6.400,5.888,6.304,6.419,,,HOLD｜from_trades｜entry_stage=0609D3｜quantity=500｜entry_price=6.400,2026-06-09,0609D3,6.400,500,500,3205.03
-002460,赣锋锂业,,HOLD,position,hold,data/trades/tulong_trades.csv,67.590,62.183,66.576,67.793,,,HOLD｜from_trades｜entry_stage=0609D3｜quantity=100｜entry_price=67.590,2026-06-09,0609D3,67.590,100,100,6764.07
-002631,德尔未来,,HOLD,position,hold,data/trades/tulong_trades.csv,8.030,7.388,7.910,8.054,,,HOLD｜from_trades｜entry_stage=0609D3｜quantity=400｜entry_price=8.030,2026-06-09,0609D3,8.030,400,400,3217.03
-601991,大唐发电,,HOLD,position,hold,data/trades/tulong_trades.csv,7.480,6.882,7.368,7.502,,,HOLD｜from_trades｜entry_stage=0609D3｜quantity=500｜entry_price=7.480,2026-06-09,0609D3,7.480,500,500,3745.04
-603270,金帝股份,,HOLD,position,hold,data/trades/tulong_trades.csv,30.060,27.655,29.609,30.150,,,HOLD｜from_trades｜entry_stage=0609D3｜quantity=200｜entry_price=30.060,2026-06-09,0609D3,30.060,200,200,6022.06
+603661,恒林股份,家居用品,0612D3,watch,active,0612D3_watch_scan_20260611_233915.csv,36.17,33.41,35.63,36.28,1,93.0,0612D3｜watch｜active｜D1较早封板；D1炸板1次；D2量比温和1.21；D2有冲高回落；D2收盘离支撑有安全垫；D2收盘近十字；成交额可跟踪；换手适中,,,,,,
+000558,天府文旅,旅游及景,0612D3,watch,active,0612D3_watch_scan_20260611_233915.csv,3.91,3.54,3.85,3.92,2,87.0,0612D3｜watch｜active｜D1未炸板；D2量比略高1.71；D2回落充分；D2收盘离支撑有安全垫；D2盘中上冲明显；D2收盘近十字；成交额可跟踪；换手适中,,,,,,
+002256,兆新股份,电力,0612D3,watch,active,0612D3_watch_scan_20260611_233915.csv,4.20,3.97,4.14,4.21,3,82.0,0612D3｜watch｜active｜D1较早封板；D1未炸板；封板资金较足；D2量比2.12在2-3倍，需其他条件补强；D2回落充分；D2收盘离支撑有安全垫；D2盘中上冲明显；成交额可跟踪；换手适中,,,,,,
+600981,苏豪汇鸿,贸易Ⅱ,0612D3,watch,active,0612D3_watch_scan_20260611_233915.csv,2.78,2.46,2.74,2.79,4,76.0,0612D3｜watch｜active｜D1炸板1次；D2量比2.02在2-3倍，需其他条件补强；D2有冲高回落；D2收盘离支撑有安全垫；D2盘中上冲明显；D2收盘近十字；成交额可跟踪；换手适中,,,,,,
+002240,盛新锂能,,HOLD,position,hold,data/trades/tulong_trades.csv,48.680,44.786,47.950,48.826,,,HOLD｜from_trades｜entry_stage=0611D3｜quantity=200｜entry_price=48.680,2026-06-11,0611D3,48.680,200,200,9746.10
+003026,中晶科技,,HOLD,position,hold,data/trades/tulong_trades.csv,36.425,33.511,35.879,36.534,,,HOLD｜from_trades｜entry_stage=0611D3｜quantity=200｜entry_price=36.425,2026-06-11,0611D3,36.425,200,200,7295.08
