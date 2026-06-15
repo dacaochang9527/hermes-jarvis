@@ -65,10 +65,16 @@ references/tulong-current-rules.md
 references/tulong-operations.md
 ```
 
-当用户发送当天买卖/成交截图，要求“整理到交易文档/交易流水/持仓记录”时，加载：
+当用户发送当天买卖/成交截图，要求"整理到交易文档/交易流水/持仓记录"时，加载：
 
 ```text
 references/tulong-trade-screenshot-entry.md
+```
+
+当涉及 akshare 接口调用细节、消息面复核用哪个 API、参数名陷阱、或盘中行情拉取代码时，加载：
+
+```text
+references/tulong-data-apis.md
 ```
 
 ## 屠龙会话纪律
@@ -86,6 +92,7 @@ references/tulong-trade-screenshot-entry.md
 - 不要因为某天朋友规则表现较好就把它静默设成默认。吸收朋友规则有效部分应走正式规则变更协议：先在复盘确认，再修改标准主规则和同步各层。
 - 当复盘结论是“标准规则负责不漏强，new_strategy_full 负责能不能做”这类权重重排时，默认处理为标准主规则吸收可参与性权重，而不是把外部策略设为默认；重点检查 active/radar 分层、`pool_subtype` 输出、preopen 只切 active、复盘归因拆分是否同步。
 - D3 交易归因必须拆分为 D3 active、D3 radar、HOLD/T、策略外、ETF；当日 D3 策略胜率只统计 active 内交易，不混入 HOLD/T、策略外或 ETF。
+- 当用户质疑“大盘/指数很强但 D3 active 很弱”或要求引入板块因素时，先按实际 watch 源拆分 active/radar 表现，再看 `sector_strength_score` / `sector_strength_note`；板块强度是强势潜质侧的参考权重，不替代个股结构、买点区和失效线。
 
 ## 维护纪律
 

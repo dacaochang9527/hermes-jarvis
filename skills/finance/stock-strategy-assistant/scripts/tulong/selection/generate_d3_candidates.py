@@ -27,7 +27,9 @@ from stock_assistant.strategy_tulong import (  # noqa: E402
     is_d2_pullback,
     is_d2_strong_continuation,
     is_d2_balanced_cross,
+    join_flags,
     safe_float,
+    sector_strength_adjustment,
 )
 
 
@@ -78,6 +80,8 @@ class Candidate:
     d2_volume_ratio: float
     d2_pullback: float
     above_support: float
+    sector_strength_score: float
+    sector_strength_note: str
     note: str
     flags: str
 
@@ -274,6 +278,7 @@ def candidate_profile(candidate: Candidate) -> D3CandidateProfile:
         zone_low=candidate.zone_low,
         zone_high=candidate.zone_high,
         d2_pullback=candidate.d2_pullback,
+        sector_strength_score=candidate.sector_strength_score,
         flags=candidate.flags,
     )
 
@@ -289,6 +294,24 @@ def auto_narrow_candidates(candidates: list[Candidate], limit: int) -> tuple[lis
     fallback = [c for c in ranked if c not in preferred]
     selected = (preferred + fallback)[:limit]
     return selected, [c for c in ranked if c not in selected]
+
+
+def apply_sector_strength_scores(candidates: list[Candidate]) -> None:
+    by_industry: dict[str, list[Candidate]] = {}
+    for candidate in candidates:
+        by_industry.setdefault(candidate.industry, []).append(candidate)
+
+    for same_industry in by_industry.values():
+        count = len(same_industry)
+        avg_d2_pct = sum(c.d2_pct for c in same_industry) / count if count else 0.0
+        strong_count = sum(1 for c in same_industry if c.d2_pct >= 5)
+        for candidate in same_industry:
+            profile = sector_strength_adjustment(candidate.industry, count, avg_d2_pct, strong_count)
+            candidate.sector_strength_score = profile.score
+            candidate.sector_strength_note = profile.note
+            candidate.score += profile.score
+            candidate.note = join_flags(candidate.note, profile.note)
+            candidate.flags = join_flags(candidate.flags, profile.flags)
 
 
 def d1_record(row, exclude_reason: str | None = None) -> dict:
@@ -405,12 +428,14 @@ def generate(args: SelectionArgs) -> OutputPaths:
             d1_first_seal=str(row.get("首次封板时间", "")), d1_open_breaks=int(safe_float(row.get("炸板次数"))), d1_fund=safe_float(row.get("封板资金")),
             d2_open=d2.open, d2_high=d2.high, d2_low=d2.low, d2_close=d2.close, d2_pct=d2.pct_chg or 0,
             d2_amount=d2.amount, d2_turnover=d2.turnover_rate or 0, d2_volume_ratio=vol_ratio,
-            d2_pullback=pullback, above_support=d2.close / support - 1, note=note, flags=flags,
+            d2_pullback=pullback, above_support=d2.close / support - 1,
+            sector_strength_score=0.0, sector_strength_note="", note=note, flags=flags,
         ))
 
     d1_kept.sort(key=lambda r: (hhmm_to_int(r["first_seal"]), r["breaks"], -r["fund_yi"]))
     write_d1_outputs(paths, args.d3_label, args.d1_date, zt, d1_kept, d1_excluded)
 
+    apply_sector_strength_scores(raw)
     raw.sort(key=lambda c: c.score, reverse=True)
     selected, narrowed_out = auto_narrow_candidates(raw, args.max_candidates + 10)
 
@@ -443,6 +468,7 @@ def generate(args: SelectionArgs) -> OutputPaths:
         lines.append(f"- 观察价 {c.trigger_price:.2f}｜买点区 {c.zone_low:.2f}–{c.zone_high:.2f}｜失效 {c.invalid_price:.2f}")
         lines.append(f"- D2 收 {c.d2_close:.2f}，高 {c.d2_high:.2f}，低 {c.d2_low:.2f}，涨跌 {c.d2_pct:.2f}%，成交额 {fmt_yi(c.d2_amount)}，换手 {c.d2_turnover:.2f}%")
         lines.append(f"- 结构：D2/D1量比 {c.d2_volume_ratio:.2f}｜高点回落 {c.d2_pullback*100:.1f}%｜安全垫 {c.above_support*100:.1f}%")
+        lines.append(f"- 板块强度参考分：{c.sector_strength_score:+.1f}｜{c.sector_strength_note}")
         lines.append(f"- D1封板结构：首次封板 {c.d1_first_seal}｜炸板 {c.d1_open_breaks}｜封板资金 {fmt_yi(c.d1_fund)}")
         lines.append(f"- note：{c.note}")
         if c.flags:
@@ -455,6 +481,7 @@ def generate(args: SelectionArgs) -> OutputPaths:
             lines.append(f"- 观察价 {c.trigger_price:.2f}｜买点区 {c.zone_low:.2f}–{c.zone_high:.2f}｜失效 {c.invalid_price:.2f}")
             lines.append(f"- D2 收 {c.d2_close:.2f}，高 {c.d2_high:.2f}，低 {c.d2_low:.2f}，涨跌 {c.d2_pct:.2f}%，成交额 {fmt_yi(c.d2_amount)}，换手 {c.d2_turnover:.2f}%")
             lines.append(f"- 结构：D2/D1量比 {c.d2_volume_ratio:.2f}｜高点回落 {c.d2_pullback*100:.1f}%｜安全垫 {c.above_support*100:.1f}%")
+            lines.append(f"- 板块强度参考分：{c.sector_strength_score:+.1f}｜{c.sector_strength_note}")
             lines.append(f"- D1封板结构：首次封板 {c.d1_first_seal}｜炸板 {c.d1_open_breaks}｜封板资金 {fmt_yi(c.d1_fund)}")
             lines.append(f"- note：{c.note}")
             if c.flags:
@@ -471,7 +498,7 @@ def generate(args: SelectionArgs) -> OutputPaths:
 
     paths.report.write_text("\n".join(lines), encoding="utf-8")
     with paths.csv.open("w", newline="", encoding="utf-8") as f:
-        fields = ["code","name","industry","stage","pool_type","pool_subtype","source_file","trigger_price","invalid_price","zone_low","zone_high","rank","score","note"]
+        fields = ["code","name","industry","stage","pool_type","pool_subtype","source_file","trigger_price","invalid_price","zone_low","zone_high","rank","score","sector_strength_score","sector_strength_note","note"]
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
         for i, c in enumerate(all_candidates, 1):
@@ -481,6 +508,7 @@ def generate(args: SelectionArgs) -> OutputPaths:
                 "pool_subtype": psub,
                 "source_file": paths.csv.name, "trigger_price": f"{c.trigger_price:.2f}", "invalid_price": f"{c.invalid_price:.2f}",
                 "zone_low": f"{c.zone_low:.2f}", "zone_high": f"{c.zone_high:.2f}", "rank": i, "score": f"{c.score:.1f}",
+                "sector_strength_score": f"{c.sector_strength_score:.1f}", "sector_strength_note": c.sector_strength_note,
                 "note": f"{args.d3_label}｜watch｜{psub}｜{c.note}",
             })
     return paths

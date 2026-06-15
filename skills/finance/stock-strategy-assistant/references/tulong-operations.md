@@ -57,6 +57,8 @@ MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv
 4. 运行 `preopen_rotate_watchlist.py --date YYYY-MM-DD --force` 切池；不要只生成 CSV 就说已经进入监控。
 5. 验证三处：`tulong_active_watchlist.csv` 的 watch active 行、`tulong_d3_monitor_state.json` 的 `watchlist_source/filtered_out`、`tulong_d3_preopen_validation.json` 的 `ok=true`。若 active 只剩 HOLD，多半是 CSV BOM 或字段名问题，先修复编码再重切。
 
+如果用户要求“重新生成 / 再生成”并明确说“不要参考刚才生成的”，必须按标准生成入口重新拉取 D1/D2/行情数据并生成新的完整时间戳文件；不要读取、复用、合并或手动改写上一轮 `MMDDD3*_watch*_YYYYMMDD_HHMMSS.csv` 的结果。输出时明确新文件时间戳和 D1/D2/D3 口径，以证明本轮是独立生成。
+
 ## 买卖截图入账流程
 
 当用户发送当日买卖/持仓明细截图要求“整理到交易文档”时：
@@ -87,7 +89,7 @@ MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv
 - 读取 `data/trades/tulong_trades.csv`，按代码汇总买入/卖出数量，派生当前 open HOLD；
 - 合并写入 `data/watchlists/tulong_active_watchlist.csv`；
 - watch 源只切入 `pool_subtype=active` 的行；`radar/backup/exclude` 只保留在源 CSV/报告与 filtered_out 中，不进入正式提醒；
-- 保留 `industry`、`trigger_price`、`invalid_price`、`zone_low`、`zone_high`、`rank`、`score`、`pool_subtype`、`note`；
+- 保留 `industry`、`trigger_price`、`invalid_price`、`zone_low`、`zone_high`、`rank`、`score`、`sector_strength_score`、`sector_strength_note`、`pool_subtype`、`note`；
 - 过滤 20cm / 非沪深主板；
 - 备份旧 active CSV；
 - 重置 `last_prices`、`pending_snapshot`，更新 `watchlist_source`、`watch_date`、`stages`、`pool_types`、`filtered_out`；

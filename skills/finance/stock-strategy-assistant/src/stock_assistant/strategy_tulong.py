@@ -28,6 +28,14 @@ class D3CandidateProfile:
     zone_low: float
     zone_high: float
     d2_pullback: float = 0.0
+    sector_strength_score: float = 0.0
+    flags: str = ""
+
+
+@dataclass(frozen=True)
+class SectorStrengthProfile:
+    score: float
+    note: str
     flags: str = ""
 
 
@@ -68,6 +76,42 @@ def d3_safety_buffer(candidate: D3CandidateProfile) -> float:
     if candidate.zone_low <= 0 or candidate.invalid_price <= 0:
         return -9.99
     return (candidate.zone_low / candidate.invalid_price) - 1
+
+
+def sector_strength_adjustment(industry: str, industry_count: int, industry_avg_d2_pct: float, industry_strong_count: int) -> SectorStrengthProfile:
+    industry = str(industry or "").strip()
+    if not industry or industry_count <= 0:
+        return SectorStrengthProfile(0.0, "板块强度参考不足")
+
+    score = 0.0
+    notes: list[str] = []
+    flags: list[str] = []
+
+    if industry_count >= 3:
+        score += 4
+        notes.append(f"{industry}同批候选{industry_count}只，板块聚集")
+    elif industry_count == 2:
+        score += 2
+        notes.append(f"{industry}同批候选2只")
+    else:
+        notes.append(f"{industry}同批候选1只")
+
+    if industry_avg_d2_pct >= 5:
+        score += 4
+        notes.append(f"板块D2均涨{industry_avg_d2_pct:.1f}%")
+    elif industry_avg_d2_pct >= 2:
+        score += 2
+        notes.append(f"板块D2均涨{industry_avg_d2_pct:.1f}%")
+    elif industry_avg_d2_pct <= -2:
+        score -= 4
+        notes.append(f"板块D2均跌{abs(industry_avg_d2_pct):.1f}%")
+        flags.append("板块弱势")
+
+    if industry_strong_count >= 2:
+        score += 2
+        notes.append(f"板块内D2强势{industry_strong_count}只")
+
+    return SectorStrengthProfile(max(-6.0, min(8.0, score)), "；".join(notes), "；".join(flags))
 
 
 def d3_pool_subtype(candidate: D3CandidateProfile) -> str:

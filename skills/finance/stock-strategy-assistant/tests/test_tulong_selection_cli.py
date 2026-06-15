@@ -73,6 +73,8 @@ def candidate(**overrides):
     base = dict(
         code="600000", score=80, flags="", trigger_price=10.0, invalid_price=9.0,
         zone_low=9.85, zone_high=10.03, d2_pullback=0.04,
+        industry="通用设备", d2_pct=1.0, sector_strength_score=0.0, sector_strength_note="",
+        note="原note",
     )
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -127,3 +129,30 @@ def test_active_pool_cap_is_compressed_to_six():
     mod = load_module()
 
     assert mod.ACTIVE_POOL_CAP == 6
+
+
+def test_apply_sector_strength_scores_adjusts_score_and_note():
+    mod = load_module()
+    first = candidate(code="600001", score=70, industry="化学原料", d2_pct=6.0)
+    second = candidate(code="600002", score=70, industry="化学原料", d2_pct=5.0)
+    weak = candidate(code="600003", score=70, industry="专用设备", d2_pct=-3.0)
+
+    mod.apply_sector_strength_scores([first, second, weak])
+
+    assert first.sector_strength_score == 8.0
+    assert first.score == 78.0
+    assert "板块强势" not in first.flags
+    assert "化学原料同批候选2只" in first.note
+    assert weak.sector_strength_score == -4.0
+    assert weak.score == 66.0
+    assert "板块弱势" in weak.flags
+
+
+def test_watch_csv_keeps_sector_strength_fields():
+    mod = load_module()
+    paths = mod.build_output_paths(Path("/tmp/project"), "0615D3", "20260615_002133")
+
+    fields = ["code","name","industry","stage","pool_type","pool_subtype","source_file","trigger_price","invalid_price","zone_low","zone_high","rank","score","sector_strength_score","sector_strength_note","note"]
+
+    assert "sector_strength_score" in fields
+    assert paths.csv.name == "0615D3_watch_scan_20260615_002133.csv"

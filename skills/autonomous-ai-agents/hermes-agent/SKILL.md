@@ -905,6 +905,9 @@ hermes config set auxiliary.vision.provider <your_provider>
 hermes config set auxiliary.vision.model <model_name>
 ```
 
+### Compression configured but context still grows
+If `auxiliary.compression` is configured but a gateway/CLI session still reaches very large prompts, first distinguish trigger logic from provider routing: compression triggers at `model.context_length * compression.threshold`, while `auxiliary.compression` only chooses the summarizer after triggering. A very high `model.context_length` override can delay compression beyond the provider's practical stable window. See `references/compression-trigger-vs-provider.md` for the diagnostic checklist and mitigation pattern.
+
 ---
 
 ## Where to Find Things

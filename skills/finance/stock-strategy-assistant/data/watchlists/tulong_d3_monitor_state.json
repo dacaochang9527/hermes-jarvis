@@ -1,63 +1,42 @@
 {
   "last_prices": {
-    "603661": 35.5,
-    "000558": 4.01,
-    "002256": 4.15,
-    "600981": 2.75,
-    "002240": 51.08,
-    "003026": 33.18
+    "603315": 16.27,
+    "002490": 8.23,
+    "001268": 42.59,
+    "002824": 31.74,
+    "002240": 51.63
   },
   "pending_snapshot": null,
-  "last_event_run_at": "2026-06-12T14:59:30",
+  "last_event_run_at": "2026-06-15T14:59:48",
   "watchlist_source": [
-    "0612D3_watch_scan_20260611_233915.csv",
+    "0615D3_watch_scan_20260615_002133.csv",
     "data/trades/tulong_trades.csv"
   ],
-  "watch_date": "2026-06-12",
+  "watch_date": "2026-06-15",
   "stages": [
-    "0612D3",
+    "0615D3",
     "HOLD"
   ],
   "pool_types": [
     "position",
     "watch"
   ],
-  "updated_at": "2026-06-12T08:50:04",
+  "updated_at": "2026-06-15T08:50:30",
   "filtered_out": [
-    "002125 湘潭电化 pool_subtype=radar_not_rotated",
-    "002119 康强电子 pool_subtype=radar_not_rotated",
-    "600178 东安动力 pool_subtype=radar_not_rotated",
-    "603687 大胜达 pool_subtype=radar_not_rotated",
-    "603375 盛景微 pool_subtype=radar_not_rotated",
-    "600665 天地源 pool_subtype=radar_not_rotated"
+    "002469 三维化学 pool_subtype=radar_not_rotated",
+    "000510 新金路 pool_subtype=radar_not_rotated",
+    "600067 冠城新材 pool_subtype=radar_not_rotated",
+    "001696 宗申动力 pool_subtype=radar_not_rotated",
+    "603399 永杉锂业 pool_subtype=radar_not_rotated",
+    "000032 深桑达Ａ pool_subtype=radar_not_rotated"
   ],
   "alert_statuses": {
-    "603661": "underwater",
-    "000558": "observe",
-    "002256": "entry_zone",
-    "600981": "entry_zone",
-    "002240": "observe",
-    "003026": "invalid"
+    "603315": "entry_zone",
+    "002490": "invalid",
+    "001268": "observe",
+    "002824": "strong_up",
+    "002240": "observe"
   },
-  "pending_alerts": [
-    {
-      "event": "entry_zone",
-      "tier": "A",
-      "stage": "0612D3",
-      "code": "600981",
-      "name": "苏豪汇鸿",
-      "industry": "贸易Ⅱ",
-      "price": 2.74,
-      "pct": -1.4388489208632893,
-      "zone_low": 2.74,
-      "zone_high": 2.79,
-      "invalid": 2.46,
-      "trigger": 2.78,
-      "stop_distance": 0.11382113821138229,
-      "amount": 167175571.0,
-      "hhmm": "14:56",
-      "queued_at": "2026-06-12T14:56:29"
-    }
-  ],
-  "last_alert_flush_at": "2026-06-12T14:55:28"
+  "pending_alerts": [],
+  "last_alert_flush_at": "2026-06-15T14:30:37"
 }

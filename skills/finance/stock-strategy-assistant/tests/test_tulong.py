@@ -9,6 +9,7 @@ from stock_assistant.strategy_tulong import (
     apply_d3_safety_adjustment,
     d3_pool_subtype,
     d3_safety_buffer,
+    sector_strength_adjustment,
 )
 from stock_assistant.models import DailyBar
 from stock_assistant.strategy_tulong import (
@@ -207,3 +208,18 @@ def test_apply_d3_safety_adjustment_marks_thin_buffer():
 
 def test_d3_active_pool_cap_is_six():
     assert ACTIVE_POOL_CAP == 6
+
+
+def test_sector_strength_adjustment_rewards_clustered_strong_industry():
+    profile = sector_strength_adjustment("化学原料", industry_count=3, industry_avg_d2_pct=5.5, industry_strong_count=2)
+
+    assert profile.score == 8.0
+    assert "板块聚集" in profile.note
+    assert "板块内D2强势2只" in profile.note
+
+
+def test_sector_strength_adjustment_penalizes_weak_industry():
+    profile = sector_strength_adjustment("专用设备", industry_count=1, industry_avg_d2_pct=-2.5, industry_strong_count=0)
+
+    assert profile.score == -4.0
+    assert "板块弱势" in profile.flags

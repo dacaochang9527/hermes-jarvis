@@ -23,7 +23,7 @@ FILTER_PREFIXES = ('300', '301', '688', '689', '8', '4', '9')
 ACTIVE_FIELDNAMES = [
     'code', 'name', 'industry', 'stage', 'pool_type', 'pool_subtype', 'source_file',
     'trigger_price', 'invalid_price', 'zone_low', 'zone_high',
-    'rank', 'score', 'note',
+    'rank', 'score', 'sector_strength_score', 'sector_strength_note', 'note',
     'entry_date', 'entry_stage', 'entry_price', 'quantity',
     'sellable_quantity', 'cost_amount',
 ]
@@ -148,6 +148,8 @@ def normalize_source_rows(src: Path) -> tuple[list[dict[str, str]], list[str]]:
                 'zone_high': row.get('zone_high', ''),
                 'rank': row.get('rank') or str(len(rows) + 1),
                 'score': row.get('score', ''),
+                'sector_strength_score': row.get('sector_strength_score', ''),
+                'sector_strength_note': row.get('sector_strength_note', ''),
                 'note': row.get('note', ''),
                 'entry_date': row.get('entry_date', ''),
                 'entry_stage': row.get('entry_stage', ''),
