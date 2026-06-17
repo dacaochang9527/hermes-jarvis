@@ -59,6 +59,14 @@ MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv
 
 如果用户要求“重新生成 / 再生成”并明确说“不要参考刚才生成的”，必须按标准生成入口重新拉取 D1/D2/行情数据并生成新的完整时间戳文件；不要读取、复用、合并或手动改写上一轮 `MMDDD3*_watch*_YYYYMMDD_HHMMSS.csv` 的结果。输出时明确新文件时间戳和 D1/D2/D3 口径，以证明本轮是独立生成。
 
+生成标准 `MMDDD3` 后的收尾纪律：
+
+1. 必须读取新生成的 watch CSV 和报告摘要，核对 `active` / `radar` 数量、名单、观察价、买点区和失效位，再回复用户。
+2. 默认只生成观察池，不提前运行 `preopen_rotate_watchlist.py --force` 切入正式监控；除非用户明确要求“切池/切到监控/立即生效”。
+3. 回复里要明确“已生成但未切池”或“已切池并验证”，不要写“接下来会检查/会切池”这类未实际执行的承诺。
+4. 如果确实执行切池，必须复查 `tulong_active_watchlist.csv`、monitor state 和 preopen validation 后再说已进入监控。
+5. 生成结果优先给简洁分层清单和文件路径；详细剔除原因只在用户要求复盘/解释时展开。
+
 ## 买卖截图入账流程
 
 当用户发送当日买卖/持仓明细截图要求“整理到交易文档”时：
@@ -146,6 +154,8 @@ MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv
 `runtime/review.py` 输出交易归因时固定分为：D3 active交易、D3 radar观察但未买、HOLD管理、策略外交易、ETF。D3 当日策略表现只看 active 主池内交易；HOLD/T、策略外交易、ETF 不混入当日 D3 胜率。
 
 盘后若用户先补录交易截图、再要求复盘，注意 `tulong_active_watchlist.csv` 可能已经被 `preopen_rotate_watchlist.py --force` 重切：已买入的当日 D3 票会转成 HOLD，已清仓旧 HOLD 会退出 active。复盘归因不能直接用重切后的 active CSV 判断原始 active/radar；必须先读取当日最新原始 `MMDDD3*_watch*_YYYYMMDD_HHMMSS.csv`，用其中 `pool_subtype=active/radar` 归因今日交易，再单独从 `data/trades/tulong_trades.csv` 汇总当前 HOLD。
+
+如果已有 `reports/reviews/tulong_d3_review_YYYYMMDD.md` 早于用户盘后补录的交易流水，或报告中的交易归因与 `data/trades/tulong_trades.csv` 不一致，不要直接引用旧报告结论；应按“原始 watch + 最新 trades + 当日 snapshots/events”重新计算复盘。当前 `runtime/review.py` 若仍只读取当前 active watchlist，复盘时要手动/脚本绕过它：定位当日最新原始 watch 文件，按原始 active/radar 归因成交，再把 HOLD/策略外/ETF 单独列出。
 
 ## 排障顺序
 

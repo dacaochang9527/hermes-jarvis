@@ -43,14 +43,14 @@ auxiliary:
     provider: sub2api
     model: gpt-5.5
     base_url: http://example/v1
-    api_key: "..."        # most robust for current auxiliary resolver
+    api_key: ${SUB2API_API_KEY}  # config loader expands ${VAR}; avoids storing the raw secret
     api_key_env: SUB2API_API_KEY
     timeout: 120
 ```
 
 Notes:
 
-- In the current resolver path, `auxiliary.vision.api_key_env` alone may not be enough when `auxiliary.vision.base_url` is present, because `_resolve_task_provider_model()` reads `api_key` but not `api_key_env` for the per-task override. If direct verification still fails, copy the actual key from `.env` into `auxiliary.vision.api_key` or patch Hermes to resolve `api_key_env` for auxiliary tasks.
+- In Hermes v0.13.0, `auxiliary.vision.api_key_env` alone is not enough for this per-task override: `_resolve_task_provider_model()` reads `api_key` but not `api_key_env`. Use `api_key: ${SUB2API_API_KEY}` instead; the config loader expands `${VAR}` from the environment while keeping the raw secret in `.env`.
 - Avoid concluding that the model lacks image support when a sibling client (OpenClaw) proves it does. Treat it as provider-routing/config first.
 - Verify with a generated local test image containing known text/numbers and a one-shot Hermes call using the vision toolset. Success means the returned text/numbers match the image approximately.
 

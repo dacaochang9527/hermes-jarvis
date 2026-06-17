@@ -174,6 +174,8 @@ D3 策略表现只统计当日 active 主池内交易，不把 HOLD/T、策略�
 
 复盘归因必须以当日原始 `MMDDD3*_watch*_YYYYMMDD_HHMMSS.csv` 的 `pool_subtype` 为准，而不是直接用当前 `tulong_active_watchlist.csv`。原因：用户盘后补录交易后，`preopen_rotate_watchlist.py --force` 可能把当日买入票转成 HOLD、把清仓票移除；若复盘脚本此时只读当前 active CSV，会把原始 active/radar 归因改写，导致 D3 active 胜率失真。处理顺序：先定位当日最新原始 watch 文件，按其中 active/radar 做交易归因；再单独用交易流水汇总当前 HOLD。
 
+若盘后先生成过复盘报告、随后又补录交易截图，旧报告的交易归因视为过期；重新复盘必须用最新 `data/trades/tulong_trades.csv` 重算，而不是复述旧报告。复盘输出优先先给“D3 active 是否有交易 / radar 是否有交易 / HOLD 和策略外交易占比 / 当日 active 中真正可参与标的”四点结论，再展开个股细节。
+
 ## HOLD 持仓事实层
 
 买入后统一进入 `HOLD`。HOLD 不再依赖独立 `HOLD_position_*` 文件，当前持仓从 `data/trades/tulong_trades.csv` 的买卖记录汇总派生：同一代码买入数量减卖出数量后仍大于 0，即视为 open position。

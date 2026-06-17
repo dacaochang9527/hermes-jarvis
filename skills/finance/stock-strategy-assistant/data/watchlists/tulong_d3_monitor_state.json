@@ -1,42 +1,52 @@
 {
   "last_prices": {
-    "603315": 16.27,
-    "002490": 8.23,
-    "001268": 42.59,
-    "002824": 31.74,
-    "002240": 51.63
+    "002613": 5.11,
+    "002664": 19.34,
+    "000411": 9.87,
+    "603093": 20.78,
+    "000759": 6.06,
+    "001268": 41.74,
+    "002155": 26.5,
+    "002240": 48.3,
+    "600183": 180.14,
+    "600601": 14.36
   },
   "pending_snapshot": null,
-  "last_event_run_at": "2026-06-15T14:59:48",
+  "last_event_run_at": "2026-06-17T14:59:07",
   "watchlist_source": [
-    "0615D3_watch_scan_20260615_002133.csv",
+    "0617D3_watch_scan_20260617_002556.csv",
     "data/trades/tulong_trades.csv"
   ],
-  "watch_date": "2026-06-15",
+  "watch_date": "2026-06-17",
   "stages": [
-    "0615D3",
+    "0617D3",
     "HOLD"
   ],
   "pool_types": [
     "position",
     "watch"
   ],
-  "updated_at": "2026-06-15T08:50:30",
+  "updated_at": "2026-06-17T08:50:50",
   "filtered_out": [
-    "002469 三维化学 pool_subtype=radar_not_rotated",
-    "000510 新金路 pool_subtype=radar_not_rotated",
-    "600067 冠城新材 pool_subtype=radar_not_rotated",
-    "001696 宗申动力 pool_subtype=radar_not_rotated",
-    "603399 永杉锂业 pool_subtype=radar_not_rotated",
-    "000032 深桑达Ａ pool_subtype=radar_not_rotated"
+    "002990 盛视科技 pool_subtype=radar_not_rotated",
+    "002552 宝鼎科技 pool_subtype=radar_not_rotated",
+    "002824 和胜股份 pool_subtype=radar_not_rotated",
+    "002913 奥士康 pool_subtype=radar_not_rotated",
+    "600237 铜峰电子 pool_subtype=radar_not_rotated",
+    "600545 卓郎智能 pool_subtype=radar_not_rotated"
   ],
   "alert_statuses": {
-    "603315": "entry_zone",
-    "002490": "invalid",
+    "002613": "observe",
+    "002664": "entry_zone",
+    "000411": "underwater",
+    "603093": "underwater",
+    "000759": "observe",
     "001268": "observe",
-    "002824": "strong_up",
-    "002240": "observe"
+    "002155": "observe",
+    "002240": "cost_loss",
+    "600183": "observe",
+    "600601": "observe"
   },
   "pending_alerts": [],
-  "last_alert_flush_at": "2026-06-15T14:30:37"
+  "last_alert_flush_at": "2026-06-17T14:55:05"
 }

@@ -20,15 +20,15 @@
       "schedule_display": "* 9-14 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 5004
+        "completed": 5719
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-25T08:15:12.530807+08:00",
-      "next_run_at": "2026-06-16T09:00:00+08:00",
-      "last_run_at": "2026-06-15T14:59:48.278576+08:00",
+      "next_run_at": "2026-06-18T09:00:00+08:00",
+      "last_run_at": "2026-06-17T14:59:07.907034+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -64,15 +64,15 @@
       "schedule_display": "10 15 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 16
+        "completed": 18
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-25T08:48:14.104903+08:00",
-      "next_run_at": "2026-06-16T15:10:00+08:00",
-      "last_run_at": "2026-06-15T15:10:50.897005+08:00",
+      "next_run_at": "2026-06-18T15:10:00+08:00",
+      "last_run_at": "2026-06-17T15:10:10.745280+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -108,15 +108,15 @@
       "schedule_display": "50 8 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 13
+        "completed": 15
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-27T15:10:18.014217+08:00",
-      "next_run_at": "2026-06-16T08:50:00+08:00",
-      "last_run_at": "2026-06-15T08:50:30.834739+08:00",
+      "next_run_at": "2026-06-18T08:50:00+08:00",
+      "last_run_at": "2026-06-17T08:50:50.284106+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -152,15 +152,15 @@
       "schedule_display": "5 9 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 13
+        "completed": 15
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-27T15:10:19.095412+08:00",
-      "next_run_at": "2026-06-16T09:05:00+08:00",
-      "last_run_at": "2026-06-15T09:05:33.820620+08:00",
+      "next_run_at": "2026-06-18T09:05:00+08:00",
+      "last_run_at": "2026-06-17T09:05:53.018023+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -177,5 +177,5 @@
       "workdir": "/Users/fenomenoronaldo/.hermes/skills/finance/stock-strategy-assistant"
     }
   ],
-  "updated_at": "2026-06-15T15:10:50.898927+08:00"
+  "updated_at": "2026-06-17T15:10:10.747067+08:00"
 }

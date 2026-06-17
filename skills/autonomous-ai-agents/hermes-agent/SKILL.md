@@ -896,7 +896,20 @@ Common gateway problems:
 
 ### Auxiliary vision with custom OpenAI-compatible providers
 
-When Hermes main chat works through a custom/OpenAI-compatible provider but `vision_analyze` fails, do not assume the model lacks image support. First compare any known-good sibling client config, especially OpenClaw's `~/.openclaw/openclaw.json`, for the same provider/model and `input: ["text", "image"]` capability. If logs show `resolve_provider_client: custom/main requested but no endpoint credentials found` or `Vision provider main unavailable`, configure `auxiliary.vision` explicitly to the named provider with model, base_url, and API key/key env rather than relying on `provider: main`. See `references/vision-custom-provider-troubleshooting.md` for the diagnostic pattern, config shape, and verification recipe.
+When Hermes main chat works through a custom/OpenAI-compatible provider but `vision_analyze` fails, do not assume the model lacks image support. First compare any known-good sibling client config, especially OpenClaw's `~/.openclaw/openclaw.json`, for the same provider/model and `input: ["text", "image"]` capability. If logs show `resolve_provider_client: custom/main requested but no endpoint credentials found` or `Vision provider main unavailable`, configure `auxiliary.vision` explicitly to the named provider with model, base_url, and API key/key env rather than relying on `provider: main`.
+
+Current working pattern for a DeepSeek fallback is:
+
+```yaml
+auxiliary:
+  vision:
+    provider: deepseek
+    model: deepseek-v4-pro
+    base_url: ''
+    api_key_env: DEEPSEEK_API_KEY
+```
+
+After changing auxiliary vision routing, start a fresh session or restart the gateway so the new provider selection is actually picked up. See `references/vision-custom-provider-troubleshooting.md` for the diagnostic pattern, config shape, and verification recipe.
 
 ### Auxiliary models not working
 If `auxiliary` tasks (vision, compression, session_search) fail silently, the `auto` provider can't find a backend. Either set `OPENROUTER_API_KEY` or `GOOGLE_API_KEY`, or explicitly configure each auxiliary task's provider:
