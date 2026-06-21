@@ -1,52 +1,71 @@
 {
   "last_prices": {
-    "002613": 5.11,
-    "002664": 19.34,
-    "000411": 9.87,
-    "603093": 20.78,
-    "000759": 6.06,
-    "001268": 41.74,
-    "002155": 26.5,
-    "002240": 48.3,
-    "600183": 180.14,
-    "600601": 14.36
+    "603861": 15.43,
+    "000048": 18.95,
+    "605588": 63.05,
+    "001266": 53.1,
+    "000791": 8.57,
+    "002346": 18.43,
+    "002240": 45.74,
+    "002364": 54.15,
+    "002745": 11.31,
+    "600183": 183.87
   },
   "pending_snapshot": null,
-  "last_event_run_at": "2026-06-17T14:59:07",
+  "last_event_run_at": "2026-06-18T14:59:10",
   "watchlist_source": [
-    "0617D3_watch_scan_20260617_002556.csv",
+    "0618D3_watch_scan_20260618_005222.csv",
     "data/trades/tulong_trades.csv"
   ],
-  "watch_date": "2026-06-17",
+  "watch_date": "2026-06-18",
   "stages": [
-    "0617D3",
+    "0618D3",
     "HOLD"
   ],
   "pool_types": [
     "position",
     "watch"
   ],
-  "updated_at": "2026-06-17T08:50:50",
+  "updated_at": "2026-06-18T08:50:50",
   "filtered_out": [
-    "002990 盛视科技 pool_subtype=radar_not_rotated",
-    "002552 宝鼎科技 pool_subtype=radar_not_rotated",
-    "002824 和胜股份 pool_subtype=radar_not_rotated",
-    "002913 奥士康 pool_subtype=radar_not_rotated",
-    "600237 铜峰电子 pool_subtype=radar_not_rotated",
-    "600545 卓郎智能 pool_subtype=radar_not_rotated"
+    "603989 艾华集团 pool_subtype=radar_not_rotated",
+    "001283 豪鹏科技 pool_subtype=radar_not_rotated",
+    "002700 万憬能源 pool_subtype=radar_not_rotated",
+    "603166 福达股份 pool_subtype=radar_not_rotated",
+    "000679 大连友谊 pool_subtype=radar_not_rotated",
+    "601208 东材科技 pool_subtype=radar_not_rotated"
   ],
   "alert_statuses": {
-    "002613": "observe",
-    "002664": "entry_zone",
-    "000411": "underwater",
-    "603093": "underwater",
-    "000759": "observe",
-    "001268": "observe",
-    "002155": "observe",
-    "002240": "cost_loss",
-    "600183": "observe",
-    "600601": "observe"
+    "603861": "underwater",
+    "000048": "entry_zone",
+    "605588": "entry_zone",
+    "001266": "observe",
+    "000791": "invalid",
+    "002346": "observe",
+    "002240": "invalid",
+    "002364": "observe",
+    "002745": "observe",
+    "600183": "observe"
   },
-  "pending_alerts": [],
-  "last_alert_flush_at": "2026-06-17T14:55:05"
+  "pending_alerts": [
+    {
+      "event": "hold_recover_cost",
+      "tier": "A",
+      "stage": "HOLD",
+      "code": "600183",
+      "name": "生益科技",
+      "industry": "未知行业",
+      "price": 183.87,
+      "pct": 2.064945878434643,
+      "zone_low": 180.999,
+      "zone_high": 184.306,
+      "invalid": 169.055,
+      "trigger": 183.755,
+      "stop_distance": 0.0876342018869598,
+      "amount": 14291249456.0,
+      "hhmm": "14:57",
+      "queued_at": "2026-06-18T14:57:10"
+    }
+  ],
+  "last_alert_flush_at": "2026-06-18T14:55:08"
 }
