@@ -31,6 +31,9 @@ DAY_SESSIONS = [
     (time(10, 30), time(11, 30)),
     (time(13, 30), time(15, 0)),
 ]
+NIGHT_SESSIONS = [
+    (time(21, 0), time(23, 0)),
+]
 
 
 def now_cn() -> datetime:
@@ -41,7 +44,7 @@ def in_session(now: datetime) -> bool:
     if now.weekday() >= 5:
         return False
     current = now.time()
-    return any(start <= current <= end for start, end in DAY_SESSIONS)
+    return any(start <= current <= end for start, end in DAY_SESSIONS + NIGHT_SESSIONS)
 
 
 def fetch_text(url: str, timeout: int = 10) -> str:

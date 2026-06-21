@@ -190,10 +190,10 @@
       "context_from": null,
       "schedule": {
         "kind": "cron",
-        "expr": "* 9-15 * * 1-5",
-        "display": "* 9-15 * * 1-5"
+        "expr": "* 9-15,21-23 * * 1-5",
+        "display": "* 9-15,21-23 * * 1-5"
       },
-      "schedule_display": "* 9-15 * * 1-5",
+      "schedule_display": "* 9-15,21-23 * * 1-5",
       "repeat": {
         "times": null,
         "completed": 0
@@ -234,10 +234,10 @@
       "context_from": null,
       "schedule": {
         "kind": "cron",
-        "expr": "*/5 9-15 * * 1-5",
-        "display": "*/5 9-15 * * 1-5"
+        "expr": "*/5 9-15,21-23 * * 1-5",
+        "display": "*/5 9-15,21-23 * * 1-5"
       },
-      "schedule_display": "*/5 9-15 * * 1-5",
+      "schedule_display": "*/5 9-15,21-23 * * 1-5",
       "repeat": {
         "times": null,
         "completed": 0
@@ -309,5 +309,5 @@
       "workdir": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant"
     }
   ],
-  "updated_at": "2026-06-22T01:40:33.021600+08:00"
+  "updated_at": "2026-06-22T01:44:38.118252+08:00"
 }

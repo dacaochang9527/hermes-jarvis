@@ -23,7 +23,8 @@ trading_sessions:
     - "09:00-10:15"
     - "10:30-11:30"
     - "13:30-15:00"
-  night_session: []
+  night_session:
+    - "21:00-23:00"
   poll_only_during_sessions: true
 
 required_alert_fields:

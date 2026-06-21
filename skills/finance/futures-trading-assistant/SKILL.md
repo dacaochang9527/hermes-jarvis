@@ -42,6 +42,8 @@ The current proven public sources for PVC2609 are documented in `references/chin
 
 Feishu group alert rules and message templates are documented in `references/feishu-futures-alerts.md`.
 
+Trading-session changes for Feishu futures monitors, including day + night cron/script/config alignment, are documented in `references/feishu-trading-session-updates.md`.
+
 Pre-open guard check design is documented in `references/preopen-guard-checks.md`.
 
 The current PVC2609 Feishu monitor configuration is `configs/pvc2609_feishu_monitor.yaml`.
