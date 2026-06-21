@@ -6,7 +6,7 @@ Use this reference when adding or maintaining pre-open readiness checks for futu
 
 A pre-open guard check verifies that the monitoring system can work before the trading session starts. It is not a trading signal and should not produce directional advice.
 
-For PVC2609, the guard runs at 08:50 on trading days, before the 09:00 event monitor and half-hour briefing start.
+For PVC2609, the day-session guard runs at 08:50 on trading days before the 09:00 event monitor and half-hour briefing start. The night-session guard runs at 20:50 on trading days before the 21:00 night event monitor and half-hour briefing start.
 
 ## Recommended Checks
 

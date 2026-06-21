@@ -6,6 +6,7 @@ It does not make trading judgments; it verifies delivery/runtime/data readiness.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import re
@@ -90,7 +91,7 @@ def fetch_klines(minutes: int) -> list[dict]:
     return rows
 
 
-def check_config() -> tuple[bool, str]:
+def check_config(session: str) -> tuple[bool, str]:
     if not CONFIG_PATH.exists():
         return False, "配置文件缺失"
     text = CONFIG_PATH.read_text(encoding="utf-8")
@@ -101,10 +102,13 @@ def check_config() -> tuple[bool, str]:
         "13:30-15:00",
         "@所有人",
     ]
+    if session == "night":
+        required.append("21:00-23:00")
     missing = [item for item in required if item not in text]
     if missing:
         return False, "配置缺失：" + "、".join(missing)
-    return True, "配置OK：群目标、交易时段、@所有人模板均存在"
+    session_label = "夜盘交易时段" if session == "night" else "日盘交易时段"
+    return True, f"配置OK：群目标、{session_label}、@所有人模板均存在"
 
 
 def check_cron_jobs() -> tuple[bool, str]:
@@ -165,25 +169,43 @@ def check_state_files() -> tuple[bool, str]:
     return True, "状态OK：cooldown/dedupe文件可读或尚未生成"
 
 
-def format_message(now: datetime, checks: list[tuple[str, bool, str]]) -> str:
+def format_message(now: datetime, session: str, checks: list[tuple[str, bool, str]]) -> str:
     all_ok = all(ok for _, ok, _ in checks)
     status = "通过" if all_ok else "未通过"
+    if session == "night":
+        check_time = "20:50"
+        title = "夜盘开盘前守门校验"
+        next_text = "21:00后进入夜盘事件监控，半小时简报同步待命"
+        reminder = "提醒：夜盘盘前不做交易判断；21:00后若行情延迟超过180秒，将标记疑似延迟并避免强操作结论。"
+    else:
+        check_time = "08:50"
+        title = "开盘前守门校验"
+        next_text = "09:00后进入事件监控，半小时简报同步待命"
+        reminder = "提醒：盘前不做交易判断；09:00后若行情延迟超过180秒，将标记疑似延迟并避免强操作结论。"
     lines = [
-        "PVC2609｜08:50｜开盘前守门校验",
-        f"状态：{status}；09:00后进入事件监控，半小时简报同步待命",
+        "@所有人",
+        f"PVC2609｜{check_time}｜{title}",
+        f"状态：{status}；{next_text}",
     ]
     for label, ok, detail in checks:
         mark = "✓" if ok else "✗"
         lines.append(f"{mark} {label}：{detail}")
-    lines.append("提醒：盘前不做交易判断；09:00后若行情延迟超过180秒，将标记疑似延迟并避免强操作结论。")
+    lines.append(reminder)
     return "\n".join(lines)
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="PVC2609 pre-open guard check")
+    parser.add_argument("--session", choices=["day", "night"], default="day")
+    return parser.parse_args()
+
+
 def main() -> int:
+    args = parse_args()
     now = now_cn()
     checks: list[tuple[str, bool, str]] = []
     for label, fn in [
-        ("配置", check_config),
+        ("配置", lambda: check_config(args.session)),
         ("Cron", check_cron_jobs),
         ("行情", lambda: check_data(now)),
         ("状态文件", check_state_files),
@@ -193,7 +215,7 @@ def main() -> int:
         except Exception as exc:
             ok, detail = False, str(exc)
         checks.append((label, ok, detail))
-    print(format_message(now, checks))
+    print(format_message(now, args.session, checks))
     return 0
 
 
