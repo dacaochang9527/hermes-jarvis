@@ -58,18 +58,21 @@ def parse_quote(raw: str) -> dict:
     if len(fields) < 15:
         raise ValueError(f"quote has too few fields: {fields}")
     name = fields[0] or CONTRACT
-    last = float(fields[1])
-    bid = float(fields[2]) if fields[2] else math.nan
-    ask = float(fields[3]) if fields[3] else math.nan
-    high = float(fields[4]) if fields[4] else math.nan
-    low = float(fields[5]) if fields[5] else math.nan
-    volume = float(fields[6]) if fields[6] else math.nan
-    oi = float(fields[7]) if fields[7] else math.nan
-    date_str = fields[-2]
-    time_str = fields[-1]
+    time_raw = fields[1]
+    open_ = float(fields[2])
+    high = float(fields[3]) if fields[3] else math.nan
+    low = float(fields[4]) if fields[4] else math.nan
+    last = float(fields[5])
+    bid = float(fields[6]) if fields[6] else math.nan
+    ask = float(fields[7]) if fields[7] else math.nan
+    oi = float(fields[13]) if fields[13] else math.nan
+    volume = float(fields[14]) if fields[14] else math.nan
+    date_str = fields[17]
+    time_str = f"{time_raw[:2]}:{time_raw[2:4]}:{time_raw[4:6]}" if len(time_raw) == 6 else "00:00:00"
     quote_dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ)
     return {
         "name": name,
+        "open": open_,
         "last": last,
         "bid": bid,
         "ask": ask,
@@ -220,6 +223,7 @@ def format_message(quote: dict, levels: dict, event: dict, now: datetime, stale_
     stop_loss = levels["invalidation_long"] if "long" in event["scenario_state"] or "breakout" in event["scenario_state"] else levels["invalidation_short"]
     targets = f"先看 {levels['resistance']:.0f}/{levels['session_high']:.0f}" if quote["last"] <= levels["resistance"] else f"回看 {levels['support']:.0f}/{levels['session_low']:.0f}"
     return (
+        "@所有人\n"
         f"PVC2609｜{now.strftime('%H:%M')}｜期货事件提醒｜现价 {quote['last']:.0f}｜{data_freshness}\n"
         f"触发：{event['trigger_reason']}\n"
         f"状态：{event['scenario_state']}，需结合下一根3m确认，未确认则观望。\n"

@@ -23,6 +23,7 @@ Every pushed alert should contain:
 - Action state: observe, possible long, possible short, invalidated, stop-loss, take-profit, risk reminder.
 - Key levels: entry zone, stop loss, target zone, invalidation.
 - Data caveat when public feeds lack five-level order book or tick-by-tick active buy/sell.
+- Group mention prefix: scheduled Feishu group pushes should include `@所有人` as the first line of the message template unless the user explicitly requests a quiet push.
 
 ## Trigger Levels
 

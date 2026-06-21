@@ -45,12 +45,14 @@ def parse_quote(raw: str) -> dict:
     if not match:
         raise ValueError(f"unexpected quote response: {raw[:120]}")
     fields = match.group(1).split(",")
-    last = float(fields[1])
-    high = float(fields[4]) if fields[4] else math.nan
-    low = float(fields[5]) if fields[5] else math.nan
-    volume = float(fields[6]) if fields[6] else math.nan
-    oi = float(fields[7]) if fields[7] else math.nan
-    quote_dt = datetime.strptime(f"{fields[-2]} {fields[-1]}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ)
+    time_raw = fields[1]
+    last = float(fields[5])
+    high = float(fields[3]) if fields[3] else math.nan
+    low = float(fields[4]) if fields[4] else math.nan
+    volume = float(fields[14]) if fields[14] else math.nan
+    oi = float(fields[13]) if fields[13] else math.nan
+    time_str = f"{time_raw[:2]}:{time_raw[2:4]}:{time_raw[4:6]}" if len(time_raw) == 6 else "00:00:00"
+    quote_dt = datetime.strptime(f"{fields[17]} {time_str}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ)
     return {"last": last, "high": high, "low": low, "volume": volume, "open_interest": oi, "quote_dt": quote_dt}
 
 
@@ -181,6 +183,7 @@ def format_message(now: datetime, quote: dict, levels: dict, rows_3m: list[dict]
     else:
         direction = "多空仍在震荡，先看关键位确认"
     return (
+        "@所有人\n"
         f"PVC2609｜{now.strftime('%H:%M')}｜半小时简报｜现价 {quote['last']:.0f}｜{data_freshness}\n"
         f"走势：{direction}\n"
         f"结构：3m {trend_3m}；15m {trend_15m}\n"

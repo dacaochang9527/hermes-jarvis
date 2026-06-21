@@ -155,6 +155,7 @@ scheduled_briefings:
 
 message_templates:
   event_alert: |
+    @所有人
     {contract}｜{alert_time}｜现价 {current_price}｜{data_freshness}
     触发：{trigger_reason}
     状态：{scenario_state}
@@ -162,6 +163,7 @@ message_templates:
     风控：止损 {stop_loss}；目标 {targets}
     备注：公开数据仅一档盘口，无逐笔主动买卖；{extra_note}
   half_hour_briefing: |
+    @所有人
     {contract}｜{alert_time}｜半小时简报｜现价 {current_price}
     走势：{intraday_direction}
     结构：3m {structure_3m}；15m {structure_15m}

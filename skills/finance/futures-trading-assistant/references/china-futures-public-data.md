@@ -28,7 +28,7 @@ Known fields observed from PVC2609:
 | Index | Meaning observed | Example from 2026-06-18 snapshot |
 |---:|---|---|
 | 0 | contract name | `PVC2609` |
-| 1 | time | `150324` |
+| 1 | time as HHMMSS | `150324` |
 | 2 | open | `4638.000` |
 | 3 | high | `4641.000` |
 | 4 | low | `4580.000` |
@@ -45,6 +45,8 @@ Known fields observed from PVC2609:
 | 15 | exchange short label | `连` |
 | 16 | variety | `PVC` |
 | 17 | date | `2026-06-18` |
+
+Parsing note: combine field 17 date with field 1 HHMMSS to form the quote timestamp. Do not read the final trailing numeric fields as date/time.
 
 Limitations:
 
