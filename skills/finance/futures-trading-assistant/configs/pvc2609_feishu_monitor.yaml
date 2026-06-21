@@ -1,0 +1,182 @@
+# PVC2609 Feishu monitor configuration
+# Purpose: event-driven futures alerts to Feishu group, plus scheduled light analysis.
+
+contract:
+  display_name: PVC2609
+  exchange_symbol: V2609
+  quote_symbol: nf_V2609
+  product: PVC
+  data_sources:
+    quote_snapshot: https://hq.sinajs.cn/list=nf_V2609
+    minute_kline_base: https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_{symbol}_{type}=/InnerFuturesNewService.getFewMinLine
+    daily_kline: https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_{symbol}_daily=/InnerFuturesNewService.getDailyKLine
+
+feishu:
+  target: feishu:oc_3b94cfb91274b70374954d7b12f12432
+  mode: group_push
+  allowed_trigger_user_open_ids:
+    - ou_29f43af572af5354dcf63c44af9ca013
+
+trading_sessions:
+  timezone: Asia/Shanghai
+  day_session:
+    - "09:00-10:15"
+    - "10:30-11:30"
+    - "13:30-15:00"
+  night_session: []
+  poll_only_during_sessions: true
+
+required_alert_fields:
+  - contract
+  - quote_timestamp
+  - alert_timestamp
+  - data_freshness
+  - current_price
+  - trigger_reason
+  - scenario_state
+  - key_levels
+  - risk_control
+  - data_caveat
+
+message_intent_from_group_discussion:
+  summary: >
+    The group wants two modes: normal point-triggered operation alerts, and a simplified fixed-interval analysis every 30 minutes.
+    When price reaches predicted levels, the monitor should re-check volume, K-line shape, and indicators to decide whether the level is a real break,
+    a rebound repair, or a range-trap/whipsaw zone.
+  normal_mode: "Give the day's main operation direction; send only when key levels or risk events are triggered."
+  fixed_interval_mode: "Every 30 minutes, send simplified trend/level analysis without direct operation advice."
+  range_trap_policy: "If price repeatedly crosses the same battle zone, suppress repeated trade alerts and switch to observe/range-trap wording until a confirmed break or reclaim occurs."
+
+levels:
+  source: recompute_from_fresh_data_before_live_use
+  stale_example_from_2026_06_18:
+    pivot: 4580
+    close_reference: "4615-4616"
+    first_resistance: "4660-4675"
+    stronger_resistance: "4690-4705"
+  live_levels: {}
+
+polling:
+  quote_snapshot_interval_seconds: 60
+  kline_3m_interval_seconds: 180
+  kline_15m_interval_seconds: 900
+  stale_quote_max_seconds: 180
+
+trigger_rules:
+  price:
+    resistance_break:
+      severity: A
+      condition: "price breaks above configured resistance and one completed 3m bar holds above it"
+      state: possible_long_or_breakout_confirmed
+    support_break:
+      severity: A
+      condition: "price breaks below configured support and one completed 3m bar fails to reclaim it"
+      state: possible_short_or_breakdown_confirmed
+    reclaim:
+      severity: B
+      condition: "price reclaims a key level after false breakdown, confirmed by 3m close"
+      state: possible_reversal
+    rejection:
+      severity: B
+      condition: "price touches resistance/support but is rejected with weak close"
+      state: observe_or_possible_counter_direction
+  structure:
+    multi_timeframe_alignment:
+      severity: B
+      condition: "3m and 15m direction align after prior conflict"
+    failed_retest:
+      severity: A
+      condition: "break or reclaim occurs, then retest fails"
+    range_trap:
+      severity: C
+      condition: "same key level is crossed repeatedly without 3m/15m confirmation"
+      action: log_locally_and_suppress_trade_alert
+  volume_open_interest:
+    confirmation:
+      severity: B
+      condition: "price move is accompanied by volume expansion and meaningful open-interest delta"
+    non_confirmation:
+      severity: C
+      condition: "price reaches level but volume/open-interest does not confirm"
+      action: log_or_include_in_30min_briefing
+  risk:
+    stop_loss:
+      severity: A
+      bypass_cooldown: true
+    invalidation:
+      severity: A
+      bypass_cooldown: true
+    take_profit:
+      severity: A
+      bypass_cooldown: true
+    pre_close:
+      severity: B
+      max_per_session: 1
+
+frequency_control:
+  severity_a:
+    send_immediately: true
+    cooldown_seconds: 60
+    bypass_for:
+      - stop_loss
+      - invalidation
+      - take_profit
+  severity_b:
+    send: true
+    cooldown_seconds: 600
+    dedupe_key: "contract + direction + trigger_level + scenario_state"
+  severity_c:
+    send: false
+    write_local_log: true
+  reentry_reset:
+    enabled: true
+    description: "A deduped trigger can fire again only after price leaves the trigger zone and re-enters with fresh confirmation."
+  same_level_chop_guard:
+    enabled: true
+    max_crosses_before_suppress: 3
+    suppress_minutes: 30
+    wording: "多空交战区/横盘陷阱，暂不重复给操作提醒，等待有效突破或跌破确认。"
+
+scheduled_briefings:
+  half_hour_briefing:
+    enabled: true
+    interval_minutes: 30
+    send_during_sessions_only: true
+    include_operation_advice: false
+    fields:
+      - current_price
+      - intraday_direction
+      - nearest_support_resistance
+      - 3m_structure
+      - 15m_structure
+      - volume_open_interest_note
+      - next_watch_levels
+    cooldown_seconds: 1500
+
+message_templates:
+  event_alert: |
+    {contract}｜{alert_time}｜现价 {current_price}｜{data_freshness}
+    触发：{trigger_reason}
+    状态：{scenario_state}
+    关键位：支撑 {support}；压力 {resistance}；失效 {invalidation}
+    风控：止损 {stop_loss}；目标 {targets}
+    备注：公开数据仅一档盘口，无逐笔主动买卖；{extra_note}
+  half_hour_briefing: |
+    {contract}｜{alert_time}｜半小时简报｜现价 {current_price}
+    走势：{intraday_direction}
+    结构：3m {structure_3m}；15m {structure_15m}
+    点位：支撑 {support}；压力 {resistance}；下一观察 {next_watch_levels}
+    量仓：{volume_open_interest_note}
+    备注：本简报只给走势与点位，不给直接操作建议。
+
+local_state:
+  base_dir: /Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/runtime/pvc2609_feishu_monitor
+  event_log: events.jsonl
+  last_alert_state: last_alert_state.json
+  briefing_log: half_hour_briefings.jsonl
+
+safety:
+  no_guaranteed_profit: true
+  no_forced_trade_instruction: true
+  require_stop_loss_for_trade_setup: true
+  disclose_public_data_limitations: true

@@ -27,6 +27,7 @@ Use this skill when the user asks for:
 - Multi-timeframe futures analysis using盘口、3分、15分、30分、60分、120分、日K.
 - Futures quote/K-line data collection from public interfaces.
 - Monitoring key futures levels and deciding whether a trigger condition is met.
+- Sending futures alerts to Feishu groups when configured triggers fire.
 - Saving futures analysis to Markdown reports.
 
 Do not use this skill for:
@@ -38,6 +39,15 @@ Do not use this skill for:
 ## Public Data Sources
 
 The current proven public sources for PVC2609 are documented in `references/china-futures-public-data.md`.
+
+Feishu group alert rules and message templates are documented in `references/feishu-futures-alerts.md`.
+
+The current PVC2609 Feishu monitor configuration is `configs/pvc2609_feishu_monitor.yaml`.
+
+Current PVC2609 cron scripts:
+
+- `pvc2609_event_monitor.py`: no-agent event monitor; runs frequently during trading hours and prints only when an event should be pushed.
+- `pvc2609_half_hour_briefing.py`: no-agent briefing monitor; cron may run every 5 minutes, but the script enforces an approximately 25-30 minute send cooldown during trading sessions.
 
 For PVC2609, use:
 
@@ -70,7 +80,39 @@ Known limitations:
    - support breaks and retest fails → possible breakdown short;
    - no trigger → observe.
 6. For every scenario, include entry zone, stop loss, take profit, estimated probability, basis, invalidation condition, and position-size caveat.
-7. If saving to Markdown, write under `~/.hermes/reports/` unless the user specifies another path.
+7. If saving to Markdown, write under `~/.hermes/skills/finance/futures-trading-assistant/reports/` unless the user specifies another path.
+
+## Feishu Alert Workflow
+
+When the user asks to notify futures information to a Feishu group, design the monitor as event-driven alerts rather than fixed chatty updates.
+
+Required alert content:
+
+- Contract, quote timestamp, and alert timestamp.
+- Current price and whether the data is live or stale.
+- Trigger reason, such as key-level break, reclaim, rejection, stop-loss, or take-profit.
+- Key levels: support, resistance, invalidation, stop loss, and target zone.
+- Scenario label: observe, long setup, short setup, breakdown, reversal, stop-loss, or take-profit.
+- Risk wording: conditional language only; no guaranteed profit or forced trade instruction.
+- Data limitations: mention one-level盘口 / no tick-by-tick active buy-sell when relevant.
+
+Default trigger classes:
+
+- Price triggers: effective break/reclaim of support or resistance, preferably confirmed by one completed 3m bar.
+- Structure triggers: 3m and 15m direction alignment, failed retest, intraday high/low break, or 15m trend turn.
+- Volume/open-interest triggers: volume expansion with price movement, abnormal open-interest delta, or non-confirmation warnings.
+- Risk triggers: stop-loss, invalidation, take-profit, near close / night-session risk reminder.
+
+Default frequency controls:
+
+- Poll quote snapshot every 1 minute during trading sessions.
+- Re-evaluate 3m structure every 3 minutes and 15m structure every 15 minutes.
+- Do not push routine C-level state updates; write them locally if needed.
+- Push A-level risk events immediately: stop-loss, invalidation, key break, sharp move.
+- Push B-level setup events with a 5-10 minute cooldown per contract + direction + trigger level.
+- De-duplicate the same trigger until price leaves and re-enters the trigger zone.
+
+For the current Feishu group setup, the verified group target is `feishu:oc_3b94cfb91274b70374954d7b12f12432`. This is an environment-specific detail; confirm with the user or target list before relying on it in a different setup.
 
 ## PVC2609 Working Levels Pattern
 
@@ -126,4 +168,4 @@ Avoid language like:
 - [ ] Open interest and volume changes considered.
 - [ ] Tick/active-buy limitations disclosed when unavailable.
 - [ ] Each scenario has entry, stop loss, take profit, probability, basis, and invalidation.
-- [ ] Markdown reports are saved under `~/.hermes/reports/` unless user specifies otherwise.
+- [ ] Markdown reports are saved under `~/.hermes/skills/finance/futures-trading-assistant/reports/` unless user specifies otherwise.
