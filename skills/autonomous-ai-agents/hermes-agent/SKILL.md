@@ -153,6 +153,8 @@ Supported platforms: Telegram, Discord, Slack, WhatsApp, Signal, Email, SMS, Mat
 
 Platform docs: https://hermes-agent.nousresearch.com/docs/user-guide/messaging/
 
+Feishu group messaging setup, permissions, and verification notes: `references/feishu-gateway-group-messaging.md`.
+
 ### Sessions
 
 ```

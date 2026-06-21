@@ -150,7 +150,9 @@ Pick the closest existing category. Don't invent new top-level categories casual
 
 6. **Expecting the current session to see the new skill.** It won't. The skill loader is initialized at session start. Verify in a fresh session or via `skill_view` using the exact path.
 
-7. **Linking to skills that don't exist in-repo.** `related_skills: [some-user-local-skill]` works for you but breaks for other clones. Prefer only in-repo links.
+7. **Modifying adjacent skills while creating a new one.** When the user asks for a new class-level skill, create that skill and its own support files only. Do not patch neighboring/umbrella skills, add cross-skill contrast sections, or explain unrelated domains unless the user explicitly requests it. After creation, check the changed paths and remove any unintended edits outside the new skill directory.
+
+8. **Linking to skills that don't exist in-repo.** `related_skills: [some-user-local-skill]` works for you but breaks for other clones. Prefer only in-repo links.
 
 ## Verification Checklist
 
