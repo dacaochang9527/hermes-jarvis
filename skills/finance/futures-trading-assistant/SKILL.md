@@ -42,10 +42,13 @@ The current proven public sources for PVC2609 are documented in `references/chin
 
 Feishu group alert rules and message templates are documented in `references/feishu-futures-alerts.md`.
 
+Pre-open guard check design is documented in `references/preopen-guard-checks.md`.
+
 The current PVC2609 Feishu monitor configuration is `configs/pvc2609_feishu_monitor.yaml`.
 
 Current PVC2609 cron scripts:
 
+- `pvc2609_preopen_guard.py`: no-agent pre-open guard; runs at 08:50 on trading days and prints a Feishu-ready readiness report covering config, cron registration, quote/K-line availability, and local state-file sanity.
 - `pvc2609_event_monitor.py`: no-agent event monitor; runs frequently during trading hours and prints only when an event should be pushed.
 - `pvc2609_half_hour_briefing.py`: no-agent briefing monitor; cron may run every 5 minutes, but the script enforces an approximately 25-30 minute send cooldown during trading sessions.
 
