@@ -46,6 +46,8 @@ Trading-session changes for Feishu futures monitors, including day + night cron/
 
 Pre-open guard check design is documented in `references/preopen-guard-checks.md`.
 
+Local Markdown report to Feishu online document publishing workflow is documented in `references/feishu-report-publishing.md`.
+
 PVC monitor troubleshooting patterns for cron wrappers, Sina quote fallback, bad-state cleanup, and manual scenario-level promotion are documented in `references/pvc-monitor-troubleshooting.md`.
 
 The current PVC2609 Feishu monitor configuration is `configs/pvc2609_feishu_monitor.yaml`.

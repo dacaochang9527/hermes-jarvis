@@ -196,15 +196,15 @@
       "schedule_display": "* 9-15,21-23 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 414
+        "completed": 489
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T01:08:02.161874+08:00",
-      "next_run_at": "2026-06-22T21:00:00+08:00",
-      "last_run_at": "2026-06-22T15:59:08.603935+08:00",
+      "next_run_at": "2026-06-22T22:16:00+08:00",
+      "last_run_at": "2026-06-22T22:15:58.226434+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -240,15 +240,15 @@
       "schedule_display": "*/5 9-15,21-23 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 84
+        "completed": 100
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T01:08:03.241864+08:00",
-      "next_run_at": "2026-06-22T21:00:00+08:00",
-      "last_run_at": "2026-06-22T15:55:07.655640+08:00",
+      "next_run_at": "2026-06-22T22:20:00+08:00",
+      "last_run_at": "2026-06-22T22:15:58.274661+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -328,16 +328,16 @@
       "schedule_display": "50 20 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 0
+        "completed": 1
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T02:03:50.305146+08:00",
-      "next_run_at": "2026-06-22T20:50:00+08:00",
-      "last_run_at": null,
-      "last_status": null,
+      "next_run_at": "2026-06-23T20:50:00+08:00",
+      "last_run_at": "2026-06-22T20:50:42.926013+08:00",
+      "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
       "deliver": "feishu:oc_3b94cfb91274b70374954d7b12f12432",
@@ -353,5 +353,5 @@
       "workdir": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant"
     }
   ],
-  "updated_at": "2026-06-22T15:59:08.604581+08:00"
+  "updated_at": "2026-06-22T22:15:58.275132+08:00"
 }
