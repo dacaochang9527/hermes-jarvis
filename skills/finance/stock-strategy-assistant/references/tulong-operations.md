@@ -10,8 +10,10 @@
 
 ```bash
 cd /Users/fenomenoronaldo/.hermes/skills/finance/stock-strategy-assistant
-.venv/bin/python scripts/tulong/selection/generate_d3_candidates.py --d1-date YYYYMMDD --d2-date YYYYMMDD --d3-label MMDDD3 --d1-only
+.venv/bin/python scripts/tulong/selection/generate_d3_candidates.py --d3-date YYYYMMDD --d1-only
 ```
+
+`generate_d3_candidates.py` 会通过 akshare/Sina A 股交易日历自动倒推 D1/D2，能跳过周末和国内休市日；只有做复盘/排障需要固定历史口径时，才显式传 `--d1-date YYYYMMDD --d2-date YYYYMMDD`。例如 `0622D3` 在 2026 年端午假期后应自动倒推为 `D1=20260617`、`D2=20260618`，不是日历日或普通工作日的 0618/0619。
 
 ## 目录职责
 
@@ -55,7 +57,8 @@ MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv
 2. 将保留票设为 `pool_subtype=active`，低频观察设为 `radar`，减持/质押/权益变动/密集风险提示等降级票设为 `exclude`，并把公告原因写入 `note`。
 3. 用无 BOM UTF-8 写入，`source_file` 写调整版文件名自身。
 4. 运行 `preopen_rotate_watchlist.py --date YYYY-MM-DD --force` 切池；不要只生成 CSV 就说已经进入监控。
-5. 验证三处：`tulong_active_watchlist.csv` 的 watch active 行、`tulong_d3_monitor_state.json` 的 `watchlist_source/filtered_out`、`tulong_d3_preopen_validation.json` 的 `ok=true`。若 active 只剩 HOLD，多半是 CSV BOM 或字段名问题，先修复编码再重切。
+5. 验证三处：`tulong_active_watchlist.csv` 的 watch active 行、`data/watchlists/tulong_d3_monitor_state.json` 的 `watchlist_source/filtered_out`、`tulong_d3_preopen_validation.json` 的 `ok=true`。若 active 只剩 HOLD，多半是 CSV BOM 或字段名问题，先修复编码再重切。
+6. 注意 `reports/alerts/tulong_d3_monitor_state.json` 可能是历史旧状态，不作为当前 runtime 是否切池成功的事实源；当前 watchdog 状态以 `data/watchlists/tulong_d3_monitor_state.json` 为准。
 
 如果用户要求“重新生成 / 再生成”并明确说“不要参考刚才生成的”，必须按标准生成入口重新拉取 D1/D2/行情数据并生成新的完整时间戳文件；不要读取、复用、合并或手动改写上一轮 `MMDDD3*_watch*_YYYYMMDD_HHMMSS.csv` 的结果。输出时明确新文件时间戳和 D1/D2/D3 口径，以证明本轮是独立生成。
 

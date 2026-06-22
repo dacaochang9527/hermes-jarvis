@@ -48,8 +48,20 @@ def parse_quote(raw: str) -> dict:
     time_raw = fields[1]
     time_str = f"{time_raw[:2]}:{time_raw[2:4]}:{time_raw[4:6]}" if len(time_raw) == 6 else "00:00:00"
     quote_dt = datetime.strptime(f"{fields[17]} {time_str}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ)
+    raw_last = float(fields[5]) if fields[5] else math.nan
+    bid = float(fields[6]) if len(fields) > 6 and fields[6] else math.nan
+    ask = float(fields[7]) if len(fields) > 7 and fields[7] else math.nan
+    last = raw_last
+    if math.isnan(last) or last <= 0:
+        valid_quotes = [value for value in (bid, ask) if not math.isnan(value) and value > 0]
+        if len(valid_quotes) == 2:
+            last = sum(valid_quotes) / 2
+        elif valid_quotes:
+            last = valid_quotes[0]
+    if math.isnan(last) or last <= 0:
+        raise ValueError("quote last price unavailable")
     return {
-        "last": float(fields[5]),
+        "last": last,
         "high": float(fields[3]) if fields[3] else math.nan,
         "low": float(fields[4]) if fields[4] else math.nan,
         "open_interest": float(fields[13]) if fields[13] else math.nan,

@@ -112,11 +112,22 @@ def infer_d3_label(d3_date: date) -> str:
     return d3_date.strftime("%m%d") + "D3"
 
 
+def previous_trade_dates(d3_date: date, count: int = 2) -> list[date]:
+    calendar = ak.tool_trade_date_hist_sina()
+    trade_dates = sorted(
+        d for d in (parse_yyyymmdd(str(value).replace("-", "")) for value in calendar["trade_date"])
+        if d < d3_date
+    )
+    if len(trade_dates) < count:
+        raise RuntimeError(f"交易日历不足，无法为 {d3_date:%Y%m%d} 倒推前 {count} 个交易日")
+    return trade_dates[-count:]
+
+
 def parse_args(argv: list[str] | None = None) -> SelectionArgs:
     parser = argparse.ArgumentParser(description="生成屠龙 D3 观察池：D1 首板 + D2 确认 + D3 观察标签")
-    parser.add_argument("--d1-date", required=True, type=parse_yyyymmdd, help="D1 首板日期，YYYYMMDD")
-    parser.add_argument("--d2-date", required=True, type=parse_yyyymmdd, help="D2 确认日期，YYYYMMDD")
-    parser.add_argument("--d3-date", type=parse_yyyymmdd, help="D3 观察日期，YYYYMMDD；未传 --d3-label 时用它推导 MMDDD3")
+    parser.add_argument("--d1-date", type=parse_yyyymmdd, help="D1 首板日期，YYYYMMDD；未传时由 --d3-date 按A股交易日历倒推")
+    parser.add_argument("--d2-date", type=parse_yyyymmdd, help="D2 确认日期，YYYYMMDD；未传时由 --d3-date 按A股交易日历倒推")
+    parser.add_argument("--d3-date", type=parse_yyyymmdd, help="D3 观察日期，YYYYMMDD；未传 --d3-label 时用它推导 MMDDD3，也可倒推 D1/D2")
     parser.add_argument("--d3-label", help="D3 标签，例如 0529D3；未传时由 --d3-date 推导")
     parser.add_argument("--timestamp", default=datetime.now().strftime("%Y%m%d_%H%M%S"), help="输出文件时间戳，默认当前 YYYYMMDD_HHMMSS")
     parser.add_argument("--max-report", type=int, default=30, help="Markdown 报告最多展示多少只观察标的")
@@ -128,6 +139,12 @@ def parse_args(argv: list[str] | None = None) -> SelectionArgs:
         if not ns.d3_date:
             parser.error("必须传 --d3-label，或传 --d3-date 让脚本推导，例如 20260529 -> 0529D3")
         ns.d3_label = infer_d3_label(ns.d3_date)
+    if bool(ns.d1_date) != bool(ns.d2_date):
+        parser.error("--d1-date 和 --d2-date 必须同时传；或只传 --d3-date 让脚本按A股交易日历自动倒推")
+    if not ns.d1_date and not ns.d2_date:
+        if not ns.d3_date:
+            parser.error("未传 --d1-date/--d2-date 时，必须传 --d3-date 用于按A股交易日历倒推")
+        ns.d1_date, ns.d2_date = previous_trade_dates(ns.d3_date)
     return SelectionArgs(
         d1_date=ns.d1_date,
         d2_date=ns.d2_date,

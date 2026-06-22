@@ -37,3 +37,4 @@ PVC2609｜08:50｜开盘前守门校验
 - Do not require the pre-open quote to be live; require only that it is parseable and clearly labeled.
 - Do not silently suppress guard failures. A failed guard should still print a Feishu-ready status message with the failing checks.
 - Do not assume a YAML message template is used by runtime scripts; inspect whether scripts hardcode output before relying on config-only changes.
+- Hermes cron `script` paths must live under `~/.hermes/scripts/` and be referenced by filename. If the real runtime script is inside this skill directory, create a small wrapper in `~/.hermes/scripts/` that `cd`s into the skill directory and executes it; otherwise cron may fail with `Script not found` even when `workdir` is set.

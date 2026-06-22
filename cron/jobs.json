@@ -20,15 +20,15 @@
       "schedule_display": "* 9-14 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 6430
+        "completed": 6785
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-25T08:15:12.530807+08:00",
-      "next_run_at": "2026-06-22T09:00:00+08:00",
-      "last_run_at": "2026-06-19T14:59:20.624189+08:00",
+      "next_run_at": "2026-06-23T09:00:00+08:00",
+      "last_run_at": "2026-06-22T14:59:52.857567+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -64,15 +64,15 @@
       "schedule_display": "10 15 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 20
+        "completed": 21
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-25T08:48:14.104903+08:00",
-      "next_run_at": "2026-06-22T15:10:00+08:00",
-      "last_run_at": "2026-06-19T15:10:23.034902+08:00",
+      "next_run_at": "2026-06-23T15:10:00+08:00",
+      "last_run_at": "2026-06-22T15:10:57.752325+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -108,15 +108,15 @@
       "schedule_display": "50 8 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 17
+        "completed": 18
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-27T15:10:18.014217+08:00",
-      "next_run_at": "2026-06-22T08:50:00+08:00",
-      "last_run_at": "2026-06-19T08:50:33.708740+08:00",
+      "next_run_at": "2026-06-23T08:50:00+08:00",
+      "last_run_at": "2026-06-22T08:50:33.226177+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -152,15 +152,15 @@
       "schedule_display": "5 9 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 17
+        "completed": 18
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-27T15:10:19.095412+08:00",
-      "next_run_at": "2026-06-22T09:05:00+08:00",
-      "last_run_at": "2026-06-19T09:05:41.694447+08:00",
+      "next_run_at": "2026-06-23T09:05:00+08:00",
+      "last_run_at": "2026-06-22T09:05:42.980326+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -185,7 +185,7 @@
       "model": null,
       "provider": null,
       "base_url": null,
-      "script": "pvc2609_event_monitor.py",
+      "script": "pvc2609_event_monitor.sh",
       "no_agent": true,
       "context_from": null,
       "schedule": {
@@ -196,16 +196,16 @@
       "schedule_display": "* 9-15,21-23 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 0
+        "completed": 414
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T01:08:02.161874+08:00",
-      "next_run_at": "2026-06-22T09:00:00+08:00",
-      "last_run_at": null,
-      "last_status": null,
+      "next_run_at": "2026-06-22T21:00:00+08:00",
+      "last_run_at": "2026-06-22T15:59:08.603935+08:00",
+      "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
       "deliver": "feishu:oc_3b94cfb91274b70374954d7b12f12432",
@@ -229,7 +229,7 @@
       "model": null,
       "provider": null,
       "base_url": null,
-      "script": "pvc2609_half_hour_briefing.py",
+      "script": "pvc2609_half_hour_briefing.sh",
       "no_agent": true,
       "context_from": null,
       "schedule": {
@@ -240,16 +240,16 @@
       "schedule_display": "*/5 9-15,21-23 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 0
+        "completed": 84
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T01:08:03.241864+08:00",
-      "next_run_at": "2026-06-22T09:00:00+08:00",
-      "last_run_at": null,
-      "last_status": null,
+      "next_run_at": "2026-06-22T21:00:00+08:00",
+      "last_run_at": "2026-06-22T15:55:07.655640+08:00",
+      "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
       "deliver": "feishu:oc_3b94cfb91274b70374954d7b12f12432",
@@ -273,7 +273,7 @@
       "model": null,
       "provider": null,
       "base_url": null,
-      "script": "pvc2609_preopen_guard.py",
+      "script": "pvc2609_preopen_guard.sh",
       "no_agent": true,
       "context_from": null,
       "schedule": {
@@ -284,16 +284,16 @@
       "schedule_display": "50 8 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 0
+        "completed": 2
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T01:40:33.016859+08:00",
-      "next_run_at": "2026-06-22T08:50:00+08:00",
-      "last_run_at": null,
-      "last_status": null,
+      "next_run_at": "2026-06-23T08:50:00+08:00",
+      "last_run_at": "2026-06-22T08:57:36.401003+08:00",
+      "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
       "deliver": "feishu:oc_3b94cfb91274b70374954d7b12f12432",
@@ -353,5 +353,5 @@
       "workdir": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant"
     }
   ],
-  "updated_at": "2026-06-22T02:03:50.308436+08:00"
+  "updated_at": "2026-06-22T15:59:08.604581+08:00"
 }

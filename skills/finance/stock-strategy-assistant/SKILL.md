@@ -87,6 +87,7 @@ references/tulong-data-apis.md
 ## 标准规则与朋友规则边界
 
 - 用户只说“生成 MMDDD3”时，默认使用标准主规则，输出文件为 `MMDDD3_watch_scan_YYYYMMDD_HHMMSS.csv`。
+- 生成 MMDDD3 时不要手工按日历日或普通工作日猜 D1/D2；默认从 D3 日期走 `generate_d3_candidates.py --d3-date YYYYMMDD --d1-only`，由脚本按 A 股交易日历自动倒推前两个交易日，跳过周末和国内休市日。只有复盘/排障需要固定历史口径时，才显式传 `--d1-date/--d2-date`。
 - 用户明确说“按朋友规则 / new_strategy / new_strategy_full / 昨天那10只口径 / 做对照”时，才额外生成外部策略结果或做差异对照。
 - 调整策略规则时，优先改动标准主规则（`generate_d3_candidates.py` 的 `score_candidate()` + 当前规则文档）；朋友规则先保持为外部策略输入/对照实验。
 - 不要因为某天朋友规则表现较好就把它静默设成默认。吸收朋友规则有效部分应走正式规则变更协议：先在复盘确认，再修改标准主规则和同步各层。

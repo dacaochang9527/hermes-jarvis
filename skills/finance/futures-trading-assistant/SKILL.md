@@ -46,6 +46,8 @@ Trading-session changes for Feishu futures monitors, including day + night cron/
 
 Pre-open guard check design is documented in `references/preopen-guard-checks.md`.
 
+PVC monitor troubleshooting patterns for cron wrappers, Sina quote fallback, bad-state cleanup, and manual scenario-level promotion are documented in `references/pvc-monitor-troubleshooting.md`.
+
 The current PVC2609 Feishu monitor configuration is `configs/pvc2609_feishu_monitor.yaml`.
 
 Current PVC2609 cron scripts:
@@ -86,6 +88,18 @@ Known limitations:
    - no trigger → observe.
 6. For every scenario, include entry zone, stop loss, take profit, estimated probability, basis, invalidation condition, and position-size caveat.
 7. If saving to Markdown, write under `~/.hermes/skills/finance/futures-trading-assistant/reports/` unless the user specifies another path.
+
+## Local Report ↔ Feishu Document Workflow
+
+When the user asks to save a futures report and make it available in Feishu, treat the workflow as a three-step closed loop:
+
+1. First save the canonical Markdown report under `~/.hermes/skills/finance/futures-trading-assistant/reports/` with a stable filename such as `{contract}_{YYYYMMDD}_{session_or_purpose}.md`.
+2. Create the Feishu online document from that local Markdown using the Hermes Agent Feishu bot-owned document workflow. Use the official Feishu Markdown-to-docx block converter rather than hand-built Markdown blocks, so headings, tables, and lists render correctly.
+3. After the Feishu document is created and its final URL is known, immediately patch the local Markdown metadata block near the top with a line like `> 飞书在线文档：https://...`.
+4. If the Feishu document is later copied/recreated/retitled and the URL changes, patch the local Markdown link to the final retained URL and delete or ignore superseded URLs.
+5. Only then send the final Feishu document link to the group when the user asks for group delivery.
+
+This keeps the local report as the durable source of truth while preserving a direct pointer to the online Feishu version.
 
 ## Feishu Alert Workflow
 

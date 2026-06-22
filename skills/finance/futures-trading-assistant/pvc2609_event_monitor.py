@@ -25,6 +25,11 @@ QUOTE_URL = "https://hq.sinajs.cn/list=nf_V2609"
 SYMBOL = "V2609"
 CONTRACT = "PVC2609"
 TZ = ZoneInfo("Asia/Shanghai")
+KEY_LEVELS = [
+    (4617.0, "前结算/09:12剧本压力待破位"),
+    (4580.0, "前交易日低点支撑"),
+    (4550.0, "前低整数支撑区"),
+]
 
 DAY_SESSIONS = [
     (time(9, 0), time(10, 15)),
@@ -65,9 +70,18 @@ def parse_quote(raw: str) -> dict:
     open_ = float(fields[2])
     high = float(fields[3]) if fields[3] else math.nan
     low = float(fields[4]) if fields[4] else math.nan
-    last = float(fields[5])
+    raw_last = float(fields[5]) if fields[5] else math.nan
     bid = float(fields[6]) if fields[6] else math.nan
     ask = float(fields[7]) if fields[7] else math.nan
+    last = raw_last
+    if math.isnan(last) or last <= 0:
+        valid_quotes = [value for value in (bid, ask) if not math.isnan(value) and value > 0]
+        if len(valid_quotes) == 2:
+            last = sum(valid_quotes) / 2
+        elif valid_quotes:
+            last = valid_quotes[0]
+    if math.isnan(last) or last <= 0:
+        raise ValueError("quote last price unavailable")
     oi = float(fields[13]) if fields[13] else math.nan
     volume = float(fields[14]) if fields[14] else math.nan
     date_str = fields[17]
@@ -189,11 +203,16 @@ def classify_event(quote: dict, rows_3m: list[dict], rows_15m: list[dict], level
         events.append(("resistance_break", "A", "压力位上破且3m收在其上", "possible_long_or_breakout_confirmed", f"上破 {resistance:.0f}"))
     if last_bar and last_bar["close"] < support and (prev_bar is None or prev_bar["close"] >= support):
         events.append(("support_break", "A", "支撑位跌破且3m未收回", "possible_short_or_breakdown_confirmed", f"跌破 {support:.0f}"))
+    for key_level, label in KEY_LEVELS:
+        if last_bar and last_bar["close"] < key_level and (prev_bar is None or prev_bar["close"] >= key_level):
+            events.append(("key_level_break", "A", f"关键位 {key_level:.0f} 跌破：{label}", "possible_short_or_breakdown_confirmed", f"跌破 {key_level:.0f}"))
     if previous_price is not None:
-        move = abs(last - float(previous_price))
-        if move >= 25:
-            direction = "快速上行" if last > float(previous_price) else "快速下行"
-            events.append(("sharp_move", "A", f"1分钟级别价格{direction}约 {move:.0f} 点", "sharp_move_watch", direction))
+        previous_price_float = float(previous_price)
+        if previous_price_float > 0:
+            move = abs(last - previous_price_float)
+            if move >= 25:
+                direction = "快速上行" if last > previous_price_float else "快速下行"
+                events.append(("sharp_move", "A", f"1分钟级别价格{direction}约 {move:.0f} 点", "sharp_move_watch", direction))
     if not events:
         return None
 

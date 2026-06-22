@@ -155,6 +155,8 @@ Platform docs: https://hermes-agent.nousresearch.com/docs/user-guide/messaging/
 
 Feishu group messaging setup, permissions, and verification notes: `references/feishu-gateway-group-messaging.md`.
 
+Feishu bot-owned cloud document/report creation, upload, collaborator, link-sharing, and group-send permissions: `references/feishu-bot-cloud-doc-permissions.md`.
+
 ### Sessions
 
 ```

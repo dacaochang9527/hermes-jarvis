@@ -69,6 +69,32 @@ def test_infer_label_from_d3_date_when_label_omitted():
     assert args.d3_label == "0529D3"
 
 
+def test_d3_date_infers_previous_a_share_trade_dates(monkeypatch):
+    mod = load_module()
+    monkeypatch.setattr(
+        mod.ak,
+        "tool_trade_date_hist_sina",
+        lambda: {"trade_date": ["2026-06-16", "2026-06-17", "2026-06-18", "2026-06-22"]},
+    )
+
+    args = mod.parse_args(["--d3-date", "20260622"])
+
+    assert args.d1_date == date(2026, 6, 17)
+    assert args.d2_date == date(2026, 6, 18)
+    assert args.d3_label == "0622D3"
+
+
+def test_d1_and_d2_dates_must_be_passed_together():
+    mod = load_module()
+
+    try:
+        mod.parse_args(["--d1-date", "20260617", "--d3-date", "20260622"])
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("parse_args should reject partial explicit D1/D2 dates")
+
+
 def candidate(**overrides):
     base = dict(
         code="600000", score=80, flags="", trigger_price=10.0, invalid_price=9.0,

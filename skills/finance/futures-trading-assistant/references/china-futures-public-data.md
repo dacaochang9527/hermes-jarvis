@@ -48,6 +48,8 @@ Known fields observed from PVC2609:
 
 Parsing note: combine field 17 date with field 1 HHMMSS to form the quote timestamp. Do not read the final trailing numeric fields as date/time.
 
+Live-session compatibility note: Sina can return `field[5] == 0.000` while bid1/ask1 in fields 6/7 are valid, especially near session start. In monitor scripts, do not treat `field[5] <= 0` as a tradable last price. Fall back to the midpoint of valid bid1/ask1, or the single valid side if only one side is present; if no positive bid/ask exists, reject the quote and suppress trading/event output.
+
 Limitations:
 
 - This is one-level盘口 only, not five-level盘口.

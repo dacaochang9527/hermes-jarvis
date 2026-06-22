@@ -31,6 +31,7 @@ Use event triggers, not every tick:
 
 - Break above resistance and hold through one completed 3m bar.
 - Break below support and fail to reclaim through one completed 3m bar.
+- Break through manually curated scenario levels from group analysis, such as prior settlement, prior-day low, or named support/resistance zones; keep these as explicit key levels instead of hiding them inside dynamic support/resistance calculations.
 - Retest failure after break/reclaim.
 - Touch stop-loss / invalidation / take-profit.
 - 3m and 15m structures align after prior conflict.

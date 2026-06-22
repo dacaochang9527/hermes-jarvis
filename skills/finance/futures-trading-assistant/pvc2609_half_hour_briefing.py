@@ -47,7 +47,18 @@ def parse_quote(raw: str) -> dict:
         raise ValueError(f"unexpected quote response: {raw[:120]}")
     fields = match.group(1).split(",")
     time_raw = fields[1]
-    last = float(fields[5])
+    raw_last = float(fields[5]) if fields[5] else math.nan
+    bid = float(fields[6]) if len(fields) > 6 and fields[6] else math.nan
+    ask = float(fields[7]) if len(fields) > 7 and fields[7] else math.nan
+    last = raw_last
+    if math.isnan(last) or last <= 0:
+        valid_quotes = [value for value in (bid, ask) if not math.isnan(value) and value > 0]
+        if len(valid_quotes) == 2:
+            last = sum(valid_quotes) / 2
+        elif valid_quotes:
+            last = valid_quotes[0]
+    if math.isnan(last) or last <= 0:
+        raise ValueError("quote last price unavailable")
     high = float(fields[3]) if fields[3] else math.nan
     low = float(fields[4]) if fields[4] else math.nan
     volume = float(fields[14]) if fields[14] else math.nan

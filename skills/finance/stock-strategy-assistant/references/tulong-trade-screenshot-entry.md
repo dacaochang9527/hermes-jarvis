@@ -58,6 +58,8 @@ brew install tesseract imagemagick
 
 写入后运行买入-卖出数量汇总，核对所有代码的 open HOLD 是否与用户预期一致。如出现负持仓或意外清仓，立即提示用户复核。
 
+如果用户要求“加监控/加入监控”且标的是已持仓或新补录交易，不要只写入 `data/trades/tulong_trades.csv`：还要运行 `scripts/tulong/runtime/preopen_rotate_watchlist.py --date YYYY-MM-DD --force` 重切 active 池，并验证 `data/watchlists/tulong_active_watchlist.csv` 中该代码的 `stage=HOLD`、`quantity`、`entry_price` 已更新。必要时用 watchdog 的 `load_watchlist()` 直接确认 runtime 能读到该代码。
+
 ## 示例
 
 截图 OCR 识别到：
