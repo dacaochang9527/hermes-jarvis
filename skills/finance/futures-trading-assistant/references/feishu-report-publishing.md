@@ -37,6 +37,8 @@ Markdown 顶部建议保留：
 
 脚本会自动完成：读取本地 Markdown、创建 bot-owned docx、调用官方 Markdown converter、用 descendant API 插入层级 blocks、设置公司内链接可读、验证 metadata URL，并回写本地 Markdown 的 `> 飞书在线文档：...` 行。默认不发群；群发送必须单独执行。
 
+发布后仍要用 `grep`/`search_files` 或 `read_file` 验证本地 Markdown 头部确实出现 `> 飞书在线文档：...`。若报告头部使用 `> 复盘时间：...` 而不是 `> 生成时间：...`，旧脚本可能返回 `patched_local_report=true` 但没有实际插入链接；此时必须手动 patch 到元信息区，并后续修正脚本兼容逻辑。
+
 可选参数：
 
 - `--title "..."`：覆盖在线文档标题。

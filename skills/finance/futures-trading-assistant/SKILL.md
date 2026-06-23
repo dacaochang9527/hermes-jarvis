@@ -96,12 +96,24 @@ Known limitations:
 When the user asks to save a futures report and make it available in Feishu, treat the workflow as a three-step closed loop:
 
 1. First save the canonical Markdown report under `~/.hermes/skills/finance/futures-trading-assistant/reports/` with a stable filename such as `{contract}_{YYYYMMDD}_{session_or_purpose}.md`.
-2. Create the Feishu online document from that local Markdown using the Hermes Agent Feishu bot-owned document workflow. Use the official Feishu Markdown-to-docx block converter rather than hand-built Markdown blocks, so headings, tables, and lists render correctly.
+2. Create the Feishu online document from that local Markdown using the fixed publisher script `publish_feishu_markdown_doc.py` documented in `references/feishu-report-publishing.md`. The script uses the official Feishu Markdown-to-docx block converter plus descendant insertion; do not hand-build Markdown blocks or reimplement the OpenAPI flow ad hoc.
 3. After the Feishu document is created and its final URL is known, immediately patch the local Markdown metadata block near the top with a line like `> 飞书在线文档：https://...`.
 4. If the Feishu document is later copied/recreated/retitled and the URL changes, patch the local Markdown link to the final retained URL and delete or ignore superseded URLs.
 5. Only then send the final Feishu document link to the group when the user asks for group delivery.
 
 This keeps the local report as the durable source of truth while preserving a direct pointer to the online Feishu version.
+
+### Personal Trade Record Review Before Publishing
+
+When the user asks for a day/night session review plus “落盘、飞书文档、发群”, first check whether user-side成交/持仓/资金 data is expected. If the user says they will provide today’s trading data, pause generation and wait; do not publish a review based only on market data and monitor logs.
+
+If the user provides成交截图:
+
+- Extract visible fields: contract, direction, fill price, volume, fill time, and preserve that the screenshot may be partial.
+- Combine personal fills with the pre-session plan and actual K-line path to review execution quality, not just market direction.
+- If the screenshot lacks complete流水、手续费、平仓盈亏、持仓汇总, do not calculate exact P&L. Say explicitly that the review covers direction, rhythm, target/stop discipline, and visible execution structure only.
+- Distinguish “plan matched the market” from “execution quality”: e.g. key-level confirmation, fragmented small orders, target-zone profit taking, second-entry conditions after first target is reached.
+- In the Feishu group message, summarize only the conclusion and document link; do not paste the full trade table or sensitive account details.
 
 ## Feishu Alert Workflow
 

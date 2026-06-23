@@ -13,7 +13,7 @@ metadata:
 
 # Stock Strategy Assistant 股票策略助手
 
-本 skill 是股票策略助手的入口和路由，不保存屠龙细则。屠龙当前规则见 `references/tulong-current-rules.md`；运行、cron、切池、日志、微信投递和排障见 `references/tulong-operations.md`。
+本 skill 是股票策略助手的入口和路由，不保存屠龙细则。屠龙当前规则见 `references/tulong-current-rules.md`；运行、cron、切池、日志、微信投递和排障见 `references/tulong-operations.md`；二进三/连板晋级观察池见 `references/tulong-2to3-selection.md`。
 
 ## 适用场景
 

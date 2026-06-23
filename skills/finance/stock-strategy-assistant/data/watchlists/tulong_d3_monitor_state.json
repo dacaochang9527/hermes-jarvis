@@ -1,42 +1,46 @@
 {
   "last_prices": {
-    "603020": 14.86,
-    "001223": 47.74,
-    "002906": 27.66,
-    "603637": 20.23,
-    "600183": 184.44
+    "603616": 6.61,
+    "000839": 2.81,
+    "002907": 13.49,
+    "002158": 32.62,
+    "603956": 4.96,
+    "000534": 29.98,
+    "600183": 167.85
   },
   "pending_snapshot": null,
-  "last_event_run_at": "2026-06-22T14:59:52",
+  "last_event_run_at": "2026-06-23T14:59:54",
   "watchlist_source": [
-    "0622D3_watch_scan_20260622_021639.csv",
+    "0623D3_watch_scan_20260622_223139.csv",
     "data/trades/tulong_trades.csv"
   ],
-  "watch_date": "2026-06-22",
+  "watch_date": "2026-06-23",
   "stages": [
-    "0622D3",
+    "0623D3",
     "HOLD"
   ],
   "pool_types": [
     "position",
     "watch"
   ],
-  "updated_at": "2026-06-22T10:10:44",
+  "updated_at": "2026-06-23T08:50:56",
   "filtered_out": [
-    "002579 中京电子 pool_subtype=radar_not_rotated",
-    "603261 立航科技 pool_subtype=radar_not_rotated",
-    "603324 盛剑科技 pool_subtype=radar_not_rotated",
-    "000695 滨海能源 pool_subtype=radar_not_rotated",
-    "000811 冰轮环境 pool_subtype=radar_not_rotated",
-    "000672 上峰材料 pool_subtype=radar_not_rotated"
+    "600162 香江控股 pool_subtype=radar_not_rotated",
+    "603201 常润股份 pool_subtype=radar_not_rotated",
+    "600545 卓郎智能 pool_subtype=radar_not_rotated",
+    "002068 黑猫股份 pool_subtype=radar_not_rotated",
+    "002655 共达电声 pool_subtype=radar_not_rotated",
+    "001296 长江材料 pool_subtype=radar_not_rotated"
   ],
   "alert_statuses": {
-    "603020": "observe",
-    "001223": "underwater",
-    "002906": "sharp_down",
-    "603637": "strong_up",
-    "600183": "observe"
+    "603616": "observe",
+    "000839": "underwater",
+    "002907": "intraday_fade",
+    "002158": "sharp_down",
+    "603956": "underwater",
+    "000534": "near_invalid",
+    "600183": "invalid"
   },
   "pending_alerts": [],
-  "last_alert_flush_at": "2026-06-22T14:45:35"
+  "last_alert_flush_at": "2026-06-23T14:55:46"
 }
