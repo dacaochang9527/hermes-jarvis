@@ -17,6 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent
 RUNTIME_DIR = BASE_DIR / "runtime" / "pvc2609_feishu_monitor"
 STATE_PATH = RUNTIME_DIR / "briefing_state.json"
 BRIEFING_LOG = RUNTIME_DIR / "half_hour_briefings.jsonl"
+PREDICTION_LEVELS_PATH = RUNTIME_DIR / "latest_prediction_levels.json"
 QUOTE_URL = "https://hq.sinajs.cn/list=nf_V2609"
 CONTRACT = "PVC2609"
 TZ = ZoneInfo("Asia/Shanghai")
@@ -128,7 +129,36 @@ def append_log(record: dict) -> None:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def derive_levels(rows_15m: list[dict], quote: dict) -> dict:
+def load_prediction_levels() -> dict:
+    if not PREDICTION_LEVELS_PATH.exists():
+        return {"levels": [], "source_doc": None}
+    try:
+        data = json.loads(PREDICTION_LEVELS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"levels": [], "source_doc": None}
+    clean_levels = []
+    for item in data.get("levels", []):
+        try:
+            price = float(item.get("price"))
+        except (TypeError, ValueError):
+            continue
+        if price <= 0:
+            continue
+        clean_levels.append({
+            "price": price,
+            "role": str(item.get("role") or "watch"),
+            "label": str(item.get("label") or item.get("role") or "预测关键位"),
+            "direction": str(item.get("direction") or "both"),
+        })
+    return {
+        "levels": clean_levels,
+        "source_doc": data.get("source_doc"),
+        "updated_at": data.get("updated_at"),
+        "session": data.get("session"),
+    }
+
+
+def derive_levels(rows_15m: list[dict], quote: dict, prediction_state: dict | None = None) -> dict:
     recent = rows_15m[-32:] if len(rows_15m) >= 8 else []
     last = quote["last"]
     if recent:
@@ -139,11 +169,24 @@ def derive_levels(rows_15m: list[dict], quote: dict) -> dict:
     else:
         support = quote["low"] if not math.isnan(quote["low"]) else last - 20
         resistance = quote["high"] if not math.isnan(quote["high"]) else last + 20
+    prediction_state = prediction_state or {"levels": []}
+    prediction_levels = prediction_state.get("levels", [])
+    lower_levels = [item["price"] for item in prediction_levels if item["price"] <= last]
+    upper_levels = [item["price"] for item in prediction_levels if item["price"] >= last]
+    if lower_levels:
+        support = max(lower_levels)
+    if upper_levels:
+        resistance = min(upper_levels)
     if support >= last:
         support = last - 8
     if resistance <= last:
         resistance = last + 8
-    return {"support": round(support, 0), "resistance": round(resistance, 0)}
+    return {
+        "support": round(support, 0),
+        "resistance": round(resistance, 0),
+        "prediction_levels": prediction_levels,
+        "prediction_source": prediction_state.get("source_doc"),
+    }
 
 
 def trend(rows: list[dict]) -> str:
@@ -194,12 +237,15 @@ def format_message(now: datetime, quote: dict, levels: dict, rows_3m: list[dict]
         direction = "短线偏弱，关注支撑位能否守住"
     else:
         direction = "多空仍在震荡，先看关键位确认"
+    prediction_note = ""
+    if levels.get("prediction_source"):
+        prediction_note = f"；预测源 {Path(str(levels['prediction_source'])).name}"
     return (
         "@所有人\n"
         f"PVC2609｜{now.strftime('%H:%M')}｜半小时简报｜现价 {quote['last']:.0f}｜{data_freshness}\n"
         f"走势：{direction}\n"
         f"结构：3m {trend_3m}；15m {trend_15m}\n"
-        f"点位：支撑 {levels['support']:.0f}；压力 {levels['resistance']:.0f}；下一观察为靠近点位后的3m收线确认\n"
+        f"点位：支撑 {levels['support']:.0f}；压力 {levels['resistance']:.0f}；下一观察为靠近预测/动态点位后的3m收线确认{prediction_note}\n"
         f"量仓：{volume_oi_note(rows_3m)}\n"
         f"备注：本简报只给走势与点位，不给直接操作建议；公开数据无逐笔主动买卖。"
     )
@@ -216,12 +262,13 @@ def main() -> int:
         quote = parse_quote(fetch_text(QUOTE_URL))
         rows_3m = fetch_klines(3)
         rows_15m = fetch_klines(15)
-        levels = derive_levels(rows_15m, quote)
+        prediction_state = load_prediction_levels()
+        levels = derive_levels(rows_15m, quote, prediction_state)
         stale_seconds = abs((now - quote["quote_dt"]).total_seconds())
         message = format_message(now, quote, levels, rows_3m, rows_15m, stale_seconds)
         state["last_sent_at"] = now.isoformat()
         save_state(state)
-        append_log({"ts": now.isoformat(), "quote_ts": quote["quote_dt"].isoformat(), "price": quote["last"], "levels": levels})
+        append_log({"ts": now.isoformat(), "quote_ts": quote["quote_dt"].isoformat(), "price": quote["last"], "levels": levels, "prediction_source": prediction_state.get("source_doc")})
         print(message)
     except Exception as exc:
         append_log({"ts": now.isoformat(), "error": str(exc)})

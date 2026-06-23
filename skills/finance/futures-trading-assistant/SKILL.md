@@ -42,11 +42,15 @@ The current proven public sources for PVC2609 are documented in `references/chin
 
 Feishu group alert rules and message templates are documented in `references/feishu-futures-alerts.md`.
 
+Mandatory day/night review + forecast handoff rules are documented in `references/session-state-chain.md`.
+
 Trading-session changes for Feishu futures monitors, including day + night cron/script/config alignment, are documented in `references/feishu-trading-session-updates.md`.
 
 Pre-open guard check design is documented in `references/preopen-guard-checks.md`.
 
 Local Markdown report to Feishu online document publishing workflow is documented in `references/feishu-report-publishing.md`.
+
+Reusable futures report structure benchmarks, including time-slice forecast-vs-actual tables, error/logic-adjustment tables, top-down multi-timeframe summaries, and small-account point feasibility, are documented in `references/report-structure-benchmarks.md`.
 
 PVC monitor troubleshooting patterns for cron wrappers, Sina quote fallback, bad-state cleanup, and manual scenario-level promotion are documented in `references/pvc-monitor-troubleshooting.md`.
 
@@ -55,8 +59,9 @@ The current PVC2609 Feishu monitor configuration is `configs/pvc2609_feishu_moni
 Current PVC2609 cron scripts:
 
 - `pvc2609_preopen_guard.py`: no-agent pre-open guard; runs at 08:50 on trading days and prints a Feishu-ready readiness report covering config, cron registration, quote/K-line availability, and local state-file sanity.
-- `pvc2609_event_monitor.py`: no-agent event monitor; runs frequently during trading hours and prints only when an event should be pushed.
-- `pvc2609_half_hour_briefing.py`: no-agent briefing monitor; cron may run every 5 minutes, but the script enforces an approximately 25-30 minute send cooldown during trading sessions.
+- `pvc2609_event_monitor.py`: no-agent event monitor; runs frequently during trading hours and prints only when an event should be pushed. It reads `runtime/pvc2609_feishu_monitor/latest_prediction_levels.json` on each tick so predicted key levels from the latest plan override stale hardcoded levels.
+- `pvc2609_half_hour_briefing.py`: no-agent briefing monitor; cron may run every 5 minutes, but the script enforces an approximately 25-30 minute send cooldown during trading sessions. It also reads `latest_prediction_levels.json` so fixed-interval briefing support/resistance follows the latest forecast.
+- `pvc2609_generate_session_report.py`: local Markdown report generator; fetches Sina quote/K-lines, reads monitor logs, and creates the upgraded day/night review + next-session plan skeleton with multi-timeframe summary, scenario validation placeholders, time-slice forecast-vs-actual table, small-account risk table, and `STATE_HANDOFF`. By default it avoids overwriting existing reports by writing a timestamped draft; use `--overwrite` for a canonical report and `--update-levels` only after the plan has been reviewed.
 
 For PVC2609, use:
 
@@ -89,7 +94,19 @@ Known limitations:
    - support breaks and retest fails → possible breakdown short;
    - no trigger → observe.
 6. For every scenario, include entry zone, stop loss, take profit, estimated probability, basis, invalidation condition, and position-size caveat.
-7. If saving to Markdown, write under `~/.hermes/skills/finance/futures-trading-assistant/reports/` unless the user specifies another path.
+7. For PVC2609 day/night reports, prefer bootstrapping with `python pvc2609_generate_session_report.py --date YYYYMMDD --session day|night`; review and complete the generated placeholders before treating the document as final. Add `--overwrite` only when replacing the canonical report, and add `--update-levels` only after the forecast levels are accepted.
+8. If saving to Markdown, write under `~/.hermes/skills/finance/futures-trading-assistant/reports/` unless the user specifies another path.
+
+## Mandatory Day/Night State Chain
+
+For PVC2609 day/night work, new reports must use a two-document rolling chain unless the user explicitly requests separate files:
+
+- Day close: `reports/{contract}_{YYYYMMDD}_day_review_night_plan.md`, combining the completed日盘复盘 and the same natural day's夜盘预测/操作计划.
+- Night close: `reports/{contract}_{YYYYMMDD}_night_review_next_day_plan.md`, combining the completed夜盘复盘 and the次日日盘预测/操作计划.
+
+Every review must compare each prior plan/scenario against actual movement in a Markdown table, including scenarios that did not trigger, with columns for planned trigger, actual path, match status, reason, and execution implication.
+
+After finalizing any forecast/operation plan, update `runtime/pvc2609_feishu_monitor/latest_prediction_levels.json` so automatic event and half-hour monitors use the latest predicted key levels instead of stale hardcoded levels. See `references/session-state-chain.md` for schema and handoff block format.
 
 ## Local Report ↔ Feishu Document Workflow
 

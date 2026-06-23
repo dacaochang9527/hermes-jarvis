@@ -25,11 +25,7 @@ QUOTE_URL = "https://hq.sinajs.cn/list=nf_V2609"
 SYMBOL = "V2609"
 CONTRACT = "PVC2609"
 TZ = ZoneInfo("Asia/Shanghai")
-KEY_LEVELS = [
-    (4617.0, "前结算/09:12剧本压力待破位"),
-    (4580.0, "前交易日低点支撑"),
-    (4550.0, "前低整数支撑区"),
-]
+PREDICTION_LEVELS_PATH = RUNTIME_DIR / "latest_prediction_levels.json"
 
 DAY_SESSIONS = [
     (time(9, 0), time(10, 15)),
@@ -158,7 +154,36 @@ def append_event(event: dict) -> None:
         f.write(json.dumps(event, ensure_ascii=False) + "\n")
 
 
-def derive_levels(rows_15m: list[dict], quote: dict) -> dict:
+def load_prediction_levels() -> dict:
+    if not PREDICTION_LEVELS_PATH.exists():
+        return {"levels": [], "source_doc": None}
+    try:
+        data = json.loads(PREDICTION_LEVELS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"levels": [], "source_doc": None}
+    clean_levels = []
+    for item in data.get("levels", []):
+        try:
+            price = float(item.get("price"))
+        except (TypeError, ValueError):
+            continue
+        if price <= 0:
+            continue
+        clean_levels.append({
+            "price": price,
+            "role": str(item.get("role") or "watch"),
+            "label": str(item.get("label") or item.get("role") or "预测关键位"),
+            "direction": str(item.get("direction") or "both"),
+        })
+    return {
+        "levels": clean_levels,
+        "source_doc": data.get("source_doc"),
+        "updated_at": data.get("updated_at"),
+        "session": data.get("session"),
+    }
+
+
+def derive_levels(rows_15m: list[dict], quote: dict, prediction_state: dict | None = None) -> dict:
     recent = rows_15m[-32:] if len(rows_15m) >= 8 else []
     last = quote["last"]
     if recent:
@@ -177,6 +202,18 @@ def derive_levels(rows_15m: list[dict], quote: dict) -> dict:
         support = min(session_low, last - 8)
     if resistance <= last:
         resistance = max(session_high, last + 8)
+    prediction_state = prediction_state or {"levels": []}
+    prediction_levels = prediction_state.get("levels", [])
+    lower_levels = [item["price"] for item in prediction_levels if item["price"] <= last]
+    upper_levels = [item["price"] for item in prediction_levels if item["price"] >= last]
+    if lower_levels:
+        support = max(lower_levels)
+    if upper_levels:
+        resistance = min(upper_levels)
+    if support >= last:
+        support = min(session_low, last - 8)
+    if resistance <= last:
+        resistance = max(session_high, last + 8)
     return {
         "support": round(support, 0),
         "resistance": round(resistance, 0),
@@ -184,6 +221,8 @@ def derive_levels(rows_15m: list[dict], quote: dict) -> dict:
         "invalidation_short": round(resistance + 10, 0),
         "session_low": round(session_low, 0),
         "session_high": round(session_high, 0),
+        "prediction_levels": prediction_levels,
+        "prediction_source": prediction_state.get("source_doc"),
     }
 
 
@@ -203,9 +242,14 @@ def classify_event(quote: dict, rows_3m: list[dict], rows_15m: list[dict], level
         events.append(("resistance_break", "A", "压力位上破且3m收在其上", "possible_long_or_breakout_confirmed", f"上破 {resistance:.0f}"))
     if last_bar and last_bar["close"] < support and (prev_bar is None or prev_bar["close"] >= support):
         events.append(("support_break", "A", "支撑位跌破且3m未收回", "possible_short_or_breakdown_confirmed", f"跌破 {support:.0f}"))
-    for key_level, label in KEY_LEVELS:
-        if last_bar and last_bar["close"] < key_level and (prev_bar is None or prev_bar["close"] >= key_level):
-            events.append(("key_level_break", "A", f"关键位 {key_level:.0f} 跌破：{label}", "possible_short_or_breakdown_confirmed", f"跌破 {key_level:.0f}"))
+    for item in levels.get("prediction_levels", []):
+        key_level = item["price"]
+        label = item["label"]
+        direction = item.get("direction", "both")
+        if last_bar and direction in ("both", "down") and last_bar["close"] < key_level and (prev_bar is None or prev_bar["close"] >= key_level):
+            events.append(("prediction_level_break", "A", f"预测关键位 {key_level:.0f} 跌破：{label}", "possible_short_or_breakdown_confirmed", f"跌破预测位 {key_level:.0f}"))
+        if last_bar and direction in ("both", "up") and last_bar["close"] > key_level and (prev_bar is None or prev_bar["close"] <= key_level):
+            events.append(("prediction_level_reclaim", "A", f"预测关键位 {key_level:.0f} 收回/上破：{label}", "possible_long_or_repair_confirmed", f"收回预测位 {key_level:.0f}"))
     if previous_price is not None:
         previous_price_float = float(previous_price)
         if previous_price_float > 0:
@@ -272,9 +316,10 @@ def main() -> int:
         stale_seconds = abs((now - quote["quote_dt"]).total_seconds())
         rows_3m = fetch_klines(3)
         rows_15m = fetch_klines(15)
-        levels = derive_levels(rows_15m, quote)
+        prediction_state = load_prediction_levels()
+        levels = derive_levels(rows_15m, quote, prediction_state)
         event = classify_event(quote, rows_3m, rows_15m, levels, state, now)
-        append_event({"ts": now.isoformat(), "quote_ts": quote["quote_dt"].isoformat(), "price": quote["last"], "levels": levels, "event": event})
+        append_event({"ts": now.isoformat(), "quote_ts": quote["quote_dt"].isoformat(), "price": quote["last"], "levels": levels, "prediction_source": prediction_state.get("source_doc"), "event": event})
         if event:
             state.setdefault("last_sent", {})[event["dedupe_key"]] = now.isoformat()
             update_last_price(state, quote)
