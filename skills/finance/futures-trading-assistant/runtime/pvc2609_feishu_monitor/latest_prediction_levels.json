@@ -1,53 +1,41 @@
 {
   "contract": "PVC2609",
-  "source_doc": "reports/pvc2609_20260623_night_review_next_day_plan.md",
-  "updated_at": "2026-06-24T00:46:00+08:00",
+  "source_doc": "reports/pvc2609_20260624_night_review_next_day_plan.md",
+  "updated_at": "2026-06-24T23:50:28.804295+08:00",
   "session": "next_day_day",
   "levels": [
     {
-      "price": 4435,
-      "role": "support",
-      "label": "夜盘低点/再破确认位",
-      "direction": "both"
-    },
-    {
-      "price": 4450,
-      "role": "weakness_confirmation",
-      "label": "跌回后弱势确认/破位空风控线",
-      "direction": "both"
-    },
-    {
       "price": 4470,
-      "role": "pivot_support",
-      "label": "夜盘尾段突破区下沿/修复回吐观察",
+      "role": "support",
+      "label": "本阶段低点/再破确认位",
+      "direction": "down"
+    },
+    {
+      "price": 4460,
+      "role": "weakness_confirmation",
+      "label": "近端支撑/修复失败观察",
       "direction": "both"
     },
     {
       "price": 4480,
-      "role": "pivot_support",
-      "label": "夜盘尾段突破区上沿/修复回吐观察",
+      "role": "midline_low",
+      "label": "短线中轴下沿",
       "direction": "both"
     },
     {
-      "price": 4490,
-      "role": "midline",
-      "label": "夜盘收盘与短线强弱中轴",
-      "direction": "both"
-    },
-    {
-      "price": 4505,
+      "price": 4510,
       "role": "resistance",
-      "label": "修复延续第一确认区",
+      "label": "压力区下沿/承压观察",
       "direction": "both"
     },
     {
-      "price": 4516,
+      "price": 4535,
       "role": "repair_confirmation",
-      "label": "0623 日内高点修复确认",
+      "label": "修复延续确认位",
       "direction": "up"
     },
     {
-      "price": 4527,
+      "price": 4545,
       "role": "major_resistance",
       "label": "大级别修复门槛",
       "direction": "up"

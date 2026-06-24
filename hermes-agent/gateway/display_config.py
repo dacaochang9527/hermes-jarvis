@@ -34,6 +34,7 @@ _GLOBAL_DEFAULTS: dict[str, Any] = {
     "tool_progress": "all",
     "show_reasoning": False,
     "tool_preview_length": 0,
+    "interim_assistant_messages": True,
     "streaming": None,  # None = follow top-level streaming config
     # When true, delete tool-progress / "Still working..." / status bubbles
     # after the final response lands on platforms that support message
@@ -55,6 +56,7 @@ _TIER_HIGH = {
     "tool_progress": "all",
     "show_reasoning": False,
     "tool_preview_length": 40,
+    "interim_assistant_messages": True,
     "streaming": None,  # follow global
 }
 
@@ -62,6 +64,7 @@ _TIER_MEDIUM = {
     "tool_progress": "new",
     "show_reasoning": False,
     "tool_preview_length": 40,
+    "interim_assistant_messages": True,
     "streaming": None,
 }
 
@@ -69,6 +72,7 @@ _TIER_LOW = {
     "tool_progress": "off",
     "show_reasoning": False,
     "tool_preview_length": 40,
+    "interim_assistant_messages": True,
     "streaming": False,
 }
 
@@ -76,6 +80,7 @@ _TIER_MINIMAL = {
     "tool_progress": "off",
     "show_reasoning": False,
     "tool_preview_length": 0,
+    "interim_assistant_messages": False,
     "streaming": False,
 }
 
@@ -190,7 +195,7 @@ def _normalise(setting: str, value: Any) -> Any:
         if value is True:
             return "all"
         return str(value).lower()
-    if setting in {"show_reasoning", "streaming"}:
+    if setting in {"show_reasoning", "streaming", "interim_assistant_messages"}:
         if isinstance(value, str):
             return value.lower() in {"true", "1", "yes", "on"}
         return bool(value)

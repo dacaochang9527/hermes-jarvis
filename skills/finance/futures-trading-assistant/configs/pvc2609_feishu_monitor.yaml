@@ -117,7 +117,7 @@ trigger_rules:
 frequency_control:
   severity_a:
     send_immediately: true
-    cooldown_seconds: 60
+    cooldown_seconds: 600
     bypass_for:
       - stop_loss
       - invalidation

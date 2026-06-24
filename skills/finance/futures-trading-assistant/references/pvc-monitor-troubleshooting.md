@@ -26,6 +26,13 @@ Common examples:
 
 When adding manual scenario levels, verify with historical 3m or 15m bars that a crossing would have triggered at the expected time, and keep dedupe keyed by the specific level.
 
+## Event Alert Noise Control
+
+- A-level key-level alerts should not use 60-second cooldown for normal support/resistance or prediction-level crossings. Use about 10 minutes unless the event is a true risk event such as stop-loss, invalidation, or take-profit.
+- One unfinished 3m bar can be observed by multiple 1-minute cron ticks. Persist the last sent 3m bar identity per dedupe key so the same bar cannot generate repeated pushes.
+- Same-level chop guard must be stateful. Track repeated crossings per event key + level; after about 3 repeated crosses, suppress group pushes for about 30 minutes and only keep local logs until price leaves the level by a reset distance.
+- When adding suppression state inside event classification, ensure the modified state is later saved by the normal state-write path; otherwise the cron's next tick will lose the dedupe metadata.
+
 ## Verification Steps
 
 1. Run syntax checks for changed Python scripts.

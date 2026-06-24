@@ -26,6 +26,11 @@ SYMBOL = "V2609"
 CONTRACT = "PVC2609"
 TZ = ZoneInfo("Asia/Shanghai")
 PREDICTION_LEVELS_PATH = RUNTIME_DIR / "latest_prediction_levels.json"
+SEVERITY_A_COOLDOWN_SECONDS = 600
+SEVERITY_B_COOLDOWN_SECONDS = 600
+SAME_LEVEL_CHOP_LIMIT = 3
+SAME_LEVEL_SUPPRESS_SECONDS = 1800
+REENTRY_RESET_POINTS = 6
 
 DAY_SESSIONS = [
     (time(9, 0), time(10, 15)),
@@ -226,6 +231,48 @@ def derive_levels(rows_15m: list[dict], quote: dict, prediction_state: dict | No
     }
 
 
+def event_level_price(dedupe_level: str) -> float | None:
+    match = re.search(r"(\d+(?:\.\d+)?)", dedupe_level)
+    if not match:
+        return None
+    return float(match.group(1))
+
+
+def bar_identity(bar: dict | None) -> str | None:
+    if not bar:
+        return None
+    return str(bar.get("datetime") or "")
+
+
+def suppress_choppy_level(state: dict, dedupe_key: str, dedupe_level: str, now: datetime) -> bool:
+    level_state = state.setdefault("level_state", {}).setdefault(dedupe_key, {})
+    suppressed_until = level_state.get("suppressed_until")
+    if suppressed_until:
+        try:
+            if now < datetime.fromisoformat(suppressed_until):
+                return True
+        except ValueError:
+            pass
+    level_state["cross_count"] = int(level_state.get("cross_count") or 0) + 1
+    level_state["last_cross_at"] = now.isoformat()
+    if level_state["cross_count"] >= SAME_LEVEL_CHOP_LIMIT:
+        level_state["suppressed_until"] = (now + timedelta(seconds=SAME_LEVEL_SUPPRESS_SECONDS)).isoformat()
+        level_state["last_suppress_reason"] = f"{dedupe_level} 反复穿越，暂按震荡区降噪"
+        return True
+    return False
+
+
+def maybe_reset_level_state(state: dict, quote: dict) -> None:
+    price = quote["last"]
+    for dedupe_key, level_state in state.get("level_state", {}).items():
+        level_price = event_level_price(dedupe_key)
+        if level_price is None:
+            continue
+        if abs(price - level_price) >= REENTRY_RESET_POINTS:
+            level_state["cross_count"] = 0
+            level_state.pop("suppressed_until", None)
+
+
 def classify_event(quote: dict, rows_3m: list[dict], rows_15m: list[dict], levels: dict, state: dict, now: datetime) -> dict | None:
     last = quote["last"]
     previous_price = state.get("last_price")
@@ -262,8 +309,12 @@ def classify_event(quote: dict, rows_3m: list[dict], rows_15m: list[dict], level
 
     key, severity, reason, scenario, dedupe_level = events[0]
     dedupe_key = f"{key}:{dedupe_level}"
+    current_bar_id = bar_identity(last_bar)
+    level_state = state.setdefault("level_state", {}).setdefault(dedupe_key, {})
+    if current_bar_id and level_state.get("last_sent_bar_id") == current_bar_id:
+        return None
     last_sent = state.get("last_sent", {}).get(dedupe_key)
-    cooldown = 60 if severity == "A" else 600
+    cooldown = SEVERITY_A_COOLDOWN_SECONDS if severity == "A" else SEVERITY_B_COOLDOWN_SECONDS
     if last_sent:
         try:
             last_dt = datetime.fromisoformat(last_sent)
@@ -271,6 +322,9 @@ def classify_event(quote: dict, rows_3m: list[dict], rows_15m: list[dict], level
                 return None
         except ValueError:
             pass
+    if suppress_choppy_level(state, dedupe_key, dedupe_level, now):
+        return None
+    level_state["last_sent_bar_id"] = current_bar_id
     return {
         "event_key": key,
         "severity": severity,
@@ -301,6 +355,7 @@ def format_message(quote: dict, levels: dict, event: dict, now: datetime, stale_
 
 
 def update_last_price(state: dict, quote: dict) -> None:
+    maybe_reset_level_state(state, quote)
     state["last_price"] = quote["last"]
     state["last_quote_time"] = quote["quote_dt"].isoformat()
     save_state(state)

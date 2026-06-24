@@ -332,10 +332,204 @@ def infer_bias(summary: dict, daily: list[Bar]) -> str:
     return "range"
 
 
+
+def price_token(value: float | str) -> str:
+    if isinstance(value, str):
+        return value
+    return fmt_price(value)
+
+
+def price_band(low: float, high: float) -> str:
+    return f"{fmt_price(low)}-{fmt_price(high)}"
+
+
+def pct_range(low: int, high: int) -> str:
+    return f"{low}%-{high}%"
+
+
+def fmt_volume(value: float) -> str:
+    if value is None or math.isnan(value):
+        return "N/A"
+    return f"{value:,.0f}"
+
+
+def fmt_oi_delta(value: float) -> str:
+    if value is None or math.isnan(value):
+        return "N/A"
+    prefix = "+" if value > 0 else ""
+    return f"{prefix}{value:,.0f}"
+
+
+def first_valid(*values: float, default: float = math.nan) -> float:
+    for value in values:
+        if value is not None and not math.isnan(value):
+            return value
+    return default
+
+
+def nearest_5(value: float) -> float:
+    if value is None or math.isnan(value):
+        return math.nan
+    return round(value / 5) * 5
+
+
+def row_at_or_before(rows: list[Bar], marker: time) -> Bar | None:
+    eligible = [row for row in rows if row.dt and row.dt.time() <= marker]
+    return eligible[-1] if eligible else None
+
+
+def session_segments(rows: list[Bar], session: str) -> list[tuple[str, list[Bar]]]:
+    if session == "night":
+        windows = [
+            ("开盘至前30分钟", time(21, 0), time(21, 30)),
+            ("破位后验证段", time(21, 30), time(22, 0)),
+            ("中段修复/延续段", time(22, 0), time(22, 40)),
+            ("尾段收盘定性段", time(22, 40), time(23, 0)),
+        ]
+    else:
+        windows = [
+            ("早盘开局", time(9, 0), time(9, 30)),
+            ("早盘主段", time(9, 30), time(10, 15)),
+            ("午前确认", time(10, 30), time(11, 30)),
+            ("午后至收盘", time(13, 30), time(15, 0)),
+        ]
+    segments = []
+    for label, start, end in windows:
+        segment_rows = [row for row in rows if row.dt and start <= row.dt.time() <= end]
+        segments.append((label, segment_rows))
+    return segments
+
+
+def segment_sentence(label: str, rows: list[Bar], levels: dict) -> str:
+    if not rows:
+        return f"{label}：未取得完整K线样本，保留人工核对入口。"
+    summary = summarize_bars(rows)
+    close = summary["close"]
+    open_ = summary["open"]
+    low = summary["low"]
+    high = summary["high"]
+    move = close - open_ if not math.isnan(close) and not math.isnan(open_) else math.nan
+    if not math.isnan(move) and move > 10:
+        action = "低位回补/修复占优"
+    elif not math.isnan(move) and move < -10:
+        action = "空头下压占优"
+    else:
+        action = "区间拉锯"
+    extra = []
+    if not math.isnan(low) and low <= levels["session_low"] + 1:
+        extra.append("触及本阶段低点")
+    if not math.isnan(high) and high >= levels["session_high"] - 1:
+        extra.append("触及本阶段高点")
+    if not math.isnan(close) and close >= levels["resistance"]:
+        extra.append("收回/逼近压力区")
+    if not math.isnan(close) and close <= levels["support"]:
+        extra.append("跌回支撑区附近")
+    suffix = "；" + "，".join(extra) if extra else ""
+    return f"{label}：区间 `{fmt_price(low)}-{fmt_price(high)}`，收 `{fmt_price(close)}`，节奏为{action}{suffix}。"
+
+
+def extract_price_mentions(text: str) -> list[str]:
+    matches = re.findall(r'(?<!\d)(4\d{3}(?:-4\d{3})?)(?!\d)', text)
+    deduped: list[str] = []
+    for match in matches:
+        if match not in deduped:
+            deduped.append(match)
+    return deduped[:16]
+
+
+def extract_prior_scenarios(path: Path | None) -> list[dict[str, str]]:
+    fallback = [
+        {"name": "方案 A：反抽承压", "trigger": "反抽到近端压力区后3m转弱", "direction": "short"},
+        {"name": "方案 B：跌破延续", "trigger": "跌破关键支撑后反抽不过", "direction": "short"},
+        {"name": "方案 C：低位守住修复", "trigger": "刺破/守住低位后重新收回中轴", "direction": "repair"},
+        {"name": "方案 D：强修复确认", "trigger": "站稳上方确认位并回踩不破", "direction": "long"},
+    ]
+    if path is None or not path.exists():
+        return fallback
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    scenarios: list[dict[str, str]] = []
+    patterns = [
+        ("方案 A", r'方案\s*A[^\n#|：:]*[：:]?([^\n|]*)'),
+        ("方案 B", r'方案\s*B[^\n#|：:]*[：:]?([^\n|]*)'),
+        ("方案 C", r'方案\s*C[^\n#|：:]*[：:]?([^\n|]*)'),
+        ("方案 D", r'方案\s*D[^\n#|：:]*[：:]?([^\n|]*)'),
+    ]
+    for label, pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        tail = match.group(1).strip(" ：:-") if match else ""
+        name = f"{label}：{tail}" if tail else fallback[len(scenarios)]["name"]
+        direction = "repair" if "修复" in name or "反抽" in name and "承压" not in name else "short"
+        if "站稳" in name or "多" in name:
+            direction = "long"
+        if "跌破" in name or "破位" in name:
+            direction = "short"
+        scenarios.append({"name": name[:42], "trigger": infer_trigger_from_name(name), "direction": direction})
+    return scenarios or fallback
+
+
+def infer_trigger_from_name(name: str) -> str:
+    if "承压" in name:
+        return "到达压力区后未站稳，并出现3m转弱"
+    if "跌破" in name or "破位" in name:
+        return "跌破支撑后反抽不过，而不是第一根急跌"
+    if "修复" in name or "反抽" in name:
+        return "低位不再续跌，重新收回中轴/确认位"
+    if "站稳" in name:
+        return "站稳上方确认位并回踩不破"
+    return "按前序计划触发条件核对"
+
+
+def evaluate_scenario(scenario: dict[str, str], levels: dict, summary: dict) -> tuple[str, str, str]:
+    high = summary["high"]
+    low = summary["low"]
+    close = summary["close"]
+    direction = scenario.get("direction", "range")
+    if direction == "short" and not math.isnan(low) and low <= levels["session_low"] + 1 and close > levels["support"]:
+        return "部分触发但延续失败", "有低位刺破/下探，但随后收回支撑或中轴，破位延续确认不足", "第一根急跌不能追，必须等反抽不过"
+    if direction == "short" and high >= levels["resistance"] and close < levels["resistance"]:
+        return "基本触发", "价格进入压力区后未能继续站稳", "可按承压转弱处理，但止损必须贴近确认位"
+    if direction in ("repair", "long") and close >= levels["close"] and high >= levels["resistance"]:
+        return "基本相符", "低位未延续下行，后段收回中轴并逼近/突破压力区", "只按修复处理，不直接定义趋势反转"
+    if direction == "long" and close < levels["upper_confirm"]:
+        return "部分触及但未确认", "修复出现，但尚未站稳上方确认位", "下一阶段继续观察确认位能否被收回"
+    return "未充分触发", "实际路径没有满足完整触发链条", "未触发也要记录，避免事后归因"
+
+
+def build_plan_levels(levels: dict) -> dict[str, float]:
+    low = levels["session_low"]
+    high = levels["session_high"]
+    close = levels["close"]
+    support = nearest_5(min(levels["support"], close - 10))
+    pivot_low = nearest_5(min(close, levels["resistance"] - 10))
+    pivot_high = nearest_5(max(close, pivot_low + 10))
+    pressure_low = nearest_5(max(levels["resistance"], close + 5))
+    pressure_high = nearest_5(max(levels["upper_confirm"], pressure_low + 10))
+    repair_confirm = nearest_5(pressure_high + 10)
+    major_resistance = nearest_5(repair_confirm + 10)
+    breakdown_target = nearest_5(min(levels["lower_confirm"], low - 10))
+    extreme_target = nearest_5(breakdown_target - 20)
+    return {
+        "low": nearest_5(low),
+        "support": support,
+        "pivot_low": pivot_low,
+        "pivot_high": pivot_high,
+        "close": nearest_5(close),
+        "pressure_low": pressure_low,
+        "pressure_high": pressure_high,
+        "repair_confirm": repair_confirm,
+        "major_resistance": major_resistance,
+        "breakdown_target": breakdown_target,
+        "extreme_target": extreme_target,
+        "high": nearest_5(high),
+    }
+
+
 def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[Bar]], daily: list[Bar], prior_report: Path | None) -> tuple[str, dict]:
     session_rows_3m = bars_for_session(klines.get(3, []), args.date, args.session)
+    session_rows_15m = bars_for_session(klines.get(15, []), args.date, args.session)
     session_summary = summarize_bars(session_rows_3m or klines.get(3, [])[-80:])
     levels = derive_levels(session_summary, quote, klines.get(15, []))
+    plan = build_plan_levels(levels)
     bias = infer_bias(session_summary, daily)
     next_session = "night" if args.session == "day" else "next_day_day"
     report_name = default_report_name(args.date, args.session)
@@ -347,186 +541,343 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
     ma20 = moving_average(daily, 20)
     daily_rsi = rsi(daily)
     prior_handoff = extract_handoff(prior_report)
-    event_records = read_jsonl(EVENT_LOG, args.date, args.session)
-    briefing_records = read_jsonl(BRIEFING_LOG, args.date, args.session)
-    monitor_note = f"事件日志 {len(event_records)} 条样本；半小时简报 {len(briefing_records)} 条样本（本报告仅列最近样本）。"
+    prior_scenarios = extract_prior_scenarios(prior_report)
+    prior_text = prior_report.read_text(encoding="utf-8", errors="ignore") if prior_report and prior_report.exists() else ""
+    prior_mentions = extract_price_mentions(prior_text)
+    event_records = read_jsonl(EVENT_LOG, args.date, args.session, limit=10)
+    briefing_records = read_jsonl(BRIEFING_LOG, args.date, args.session, limit=8)
+
+    title_date = args.date.strftime("%Y-%m-%d")
+    next_title = "夜盘" if args.session == "day" else "日盘"
+    completed_title = "日盘" if args.session == "day" else "夜盘"
+    next_date = args.date if args.session == "day" else args.date + timedelta(days=1)
+    next_date_text = next_date.strftime("%Y-%m-%d")
+    completed_label = f"{title_date} {completed_title}"
+    next_label = f"{next_date_text} {next_title}"
+    next_label_compact = f"{next_date.strftime('%m%d')} {next_title}"
+
+    open_bar = session_rows_3m[0] if session_rows_3m else None
+    close_bar = session_rows_3m[-1] if session_rows_3m else None
+    low_bar = min(session_rows_3m, key=lambda row: row.low) if session_rows_3m else None
+    high_bar = max(session_rows_3m, key=lambda row: row.high) if session_rows_3m else None
+    oi_early = row_at_or_before(session_rows_15m or session_rows_3m, time(21, 30) if args.session == "night" else time(9, 30))
+    oi_late = close_bar
+    oi_path = "持仓口径不足"
+    if oi_early and oi_late:
+        delta = oi_late.open_interest - oi_early.open_interest
+        oi_path = f"{fmt_volume(oi_early.open_interest)} → {fmt_volume(oi_late.open_interest)}，约 {fmt_oi_delta(delta)} 手"
+
+    if bias == "range_repair":
+        core_phrase = "低位假破 + 回补修复"
+        bias_sentence = "不是单边续跌，而是先下探后收回的修复结构"
+        risk_flags = "auto_generated_full_draft, false_break_low, short_covering_repair, range_trap, one_level_quote_only, no_tick_active_flow"
+    elif bias == "bearish":
+        core_phrase = "弱势延续 + 反抽待确认"
+        bias_sentence = "仍偏弱，反抽如果不能站稳压力位，容易重新回到弱势路径"
+        risk_flags = "auto_generated_full_draft, bearish_trend, breakdown_risk, one_level_quote_only, no_tick_active_flow"
+    elif bias == "repair":
+        core_phrase = "短线修复 + 上方确认"
+        bias_sentence = "短线修复更明显，但仍需上方确认位验证是否延续"
+        risk_flags = "auto_generated_full_draft, repair_confirmation_needed, range_trap, one_level_quote_only, no_tick_active_flow"
+    else:
+        core_phrase = "区间震荡 + 边界确认"
+        bias_sentence = "中轴区间反复，必须等边界触发而不是在中间追单"
+        risk_flags = "auto_generated_full_draft, range_bound, range_trap, one_level_quote_only, no_tick_active_flow"
+
+    segment_lines = [segment_sentence(label, rows, levels) for label, rows in session_segments(session_rows_3m, args.session)]
+    segment_numbered = "\n".join(f"{idx}. {line}" for idx, line in enumerate(segment_lines, 1))
 
     timeframe_rows = []
     if daily:
         latest_daily = daily[-1]
-        timeframe_rows.append(["日K", "大周期趋势背景", f"高 {fmt_price(latest_daily.high)} / 低 {fmt_price(latest_daily.low)} / 收 {fmt_price(latest_daily.close)}", f"MA5/10/20={fmt_price(ma5)}/{fmt_price(ma10)}/{fmt_price(ma20)}，RSI={daily_rsi:.1f}" if not math.isnan(daily_rsi) else f"MA5/10/20={fmt_price(ma5)}/{fmt_price(ma10)}/{fmt_price(ma20)}", "先定大背景，不用小周期单根K线推翻。"])
+        timeframe_rows.append(["日K", "大周期偏弱/等待修复确认" if latest_daily.close < first_valid(ma5, default=latest_daily.close + 1) else "日K修复观察", f"高 {fmt_price(latest_daily.high)} / 低 {fmt_price(latest_daily.low)} / 收 {fmt_price(latest_daily.close)}", f"MA5/10/20={fmt_price(ma5)}/{fmt_price(ma10)}/{fmt_price(ma20)}，RSI={daily_rsi:.1f}" if not math.isnan(daily_rsi) else f"MA5/10/20={fmt_price(ma5)}/{fmt_price(ma10)}/{fmt_price(ma20)}", "先定大背景，不能用小周期单根K线直接推翻。"])
     for minutes in (120, 60, 30, 15, 3):
         rows = klines.get(minutes, [])
         summary = summarize_bars(bars_for_session(rows, args.date, args.session) or rows[-12:])
-        timeframe_rows.append([f"{minutes}m", trend_label(rows), f"区间 {fmt_price(summary['low'])}-{fmt_price(summary['high'])} / 收 {fmt_price(summary['close'])}", f"量 {summary['volume']:.0f}，持仓变化 {fmt_price(summary['oi_delta'])}", "用于确认边界突破、跌破、回收或承压。"])
+        implication = "用于确认边界突破、跌破、回收或承压。"
+        if minutes == 3:
+            implication = "作为入场触发周期，破位/突破必须看收盘与反抽确认。"
+        elif minutes == 15:
+            implication = "用于判断修复是否有连续性，避免只看3m噪音。"
+        timeframe_rows.append([f"{minutes}m", trend_label(rows), f"区间 {fmt_price(summary['low'])}-{fmt_price(summary['high'])} / 收 {fmt_price(summary['close'])}", f"量 {fmt_volume(summary['volume'])}，持仓变化 {fmt_oi_delta(summary['oi_delta'])}", implication])
     timeframe_md = "\n".join(f"| {row[0]} | {row[1]} | {row[2]} | {row[3]} | {row[4]} |" for row in timeframe_rows)
 
-    event_md = "\n".join(format_monitor_record(record) for record in event_records) or "| 暂无 | 暂无 | 暂无 | 暂无 |"
-    briefing_md = "\n".join(format_monitor_record(record) for record in briefing_records) or "| 暂无 | 暂无 | 暂无 | 暂无 |"
+    validation_rows = []
+    for scenario in prior_scenarios[:4]:
+        status, reason, implication = evaluate_scenario(scenario, levels, session_summary)
+        validation_rows.append(f"| {scenario['name']} | {scenario['trigger']} | 本阶段区间 `{fmt_price(session_summary['low'])}-{fmt_price(session_summary['high'])}`，收 `{fmt_price(session_summary['close'])}` | {status} | {reason} | {implication} |")
+    validation_md = "\n".join(validation_rows)
 
-    title_date = args.date.strftime("%Y-%m-%d")
-    next_title = "夜盘" if args.session == "day" else "次日日盘"
-    completed_title = "日盘" if args.session == "day" else "夜盘"
-    filename_date = args.date.strftime("%Y%m%d")
-    next_date_text = args.date.strftime("%Y-%m-%d") if args.session == "day" else (args.date + timedelta(days=1)).strftime("%Y-%m-%d")
+    time_verify_md = "\n".join([
+        f"| 开盘 | 先看开盘是否直接脱离前序中轴 | 开盘 `{fmt_price(session_summary['open'])}`，首段表现见分时四段 | 基本用于定性 | 开盘通常噪音大 | 开盘前15-30分钟只观察，不抢第一根方向 |",
+        f"| 前30分钟 | 关键低/高位触发后需二次确认 | 低点 `{fmt_price(low_bar.low) if low_bar else 'N/A'}`，高点 `{fmt_price(high_bar.high) if high_bar else 'N/A'}` | 需结合触发链 | 单点触发容易假破/假突破 | 必须看反抽不过或回踩不破 |",
+        f"| 主段 | 若收回中轴，低位追空/高位追多降级 | 主段结构：{segment_lines[2] if len(segment_lines) > 2 else '样本不足'} | 自动复核 | 中段决定方向能否延续 | 中轴内不做碎单 |",
+        f"| 尾盘/收盘 | 收盘位置决定下一阶段中轴 | 收盘 `{fmt_price(session_summary['close'])}`，相对压力 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` | 可作为下一阶段起点 | 尾盘冲高/杀跌可能只是回补 | 次时段先验证收盘区是否守住 |",
+        f"| 波动区间 | 以前序关键位为边界做验证 | 实际 `{fmt_price(session_summary['low'])}-{fmt_price(session_summary['high'])}`，振幅约 `{fmt_price(session_summary['high'] - session_summary['low'])}` 点 | 区间已量化 | 边界附近最容易出现假动作 | 边界触发必须等待确认 |",
+    ])
 
-    markdown = f"""# PVC2609 {title_date} {completed_title}复盘 + {next_date_text} {next_title}计划
+    monitor_rows = []
+    for record in briefing_records or event_records[:5]:
+        monitor_rows.append(format_monitor_record(record))
+    monitor_md = "\n".join(monitor_rows) or "| 暂无 | N/A | 无本地样本 | 仅用K线复核 |"
+    event_note = f"事件日志 {len(read_jsonl(EVENT_LOG, args.date, args.session, limit=1000))} 条样本；半小时简报 {len(read_jsonl(BRIEFING_LOG, args.date, args.session, limit=1000))} 条样本。"
+
+    prior_levels_text = "、".join(prior_mentions[:10]) if prior_mentions else "未从前序文档提取到清晰点位"
+
+    markdown = f"""# PVC2609 {completed_label}复盘 + {next_label}计划
 
 > 生成时间：{generated_at.strftime('%Y-%m-%d %H:%M CST')}  
-> 生成方式：`pvc2609_generate_session_report.py` 自动骨架，需人工复核后作为正式交易文档  
+> 生成方式：`pvc2609_generate_session_report.py` 自动生成完整草稿，需人工复核后作为正式交易文档  
 > 标的：PVC2609 期货合约  
-> 复盘对象：{title_date} {completed_title}  
+> 复盘对象：{completed_label}  
 > 前序计划：`{prior_report.relative_to(BASE_DIR) if prior_report else '未找到'}`  
 > 数据源：新浪期货公开 quote、3m/15m/30m/60m/120m K线、日K、本地事件监控、本地30分钟简报  
 > 数据状态：quote 返回 `{fmt_dt(quote['quote_dt'])}`，当前/收盘参考 `{fmt_price(quote['last'])}`，quote 日期与复盘日期不一致：{quote_stale}  
 > 数据限制：公开行情只有一档盘口，不能还原逐笔主动买卖；K线量仓只用于结构参考，不能直接标注多开/空开/多平/空平。  
 > 风险提示：本文为交易复盘与条件化计划，不构成确定性投资建议；期货杠杆高，必须先设止损。
 
-## 1. 一句话结论（自动草稿）
+## 1. 一句话结论
 
-{completed_title}区间 `{fmt_price(session_summary['low'])}-{fmt_price(session_summary['high'])}`，收盘/最新参考 `{fmt_price(session_summary['close'])}`；当前自动判断为 `{bias}`。下一阶段优先围绕 `{fmt_price(levels['support'])}` 支撑、`{fmt_price(levels['resistance'])}` 压力、`{fmt_price(levels['upper_confirm'])}` 上方确认位和 `{fmt_price(levels['lower_confirm'])}` 下方确认位做条件化验证。请人工复核是否存在假破、回收、承压或趋势延续。
+{completed_label}自动结论为“{core_phrase}”：本阶段区间 `{fmt_price(session_summary['low'])}-{fmt_price(session_summary['high'])}`，收盘/最新参考 `{fmt_price(session_summary['close'])}`，{bias_sentence}。{next_label}主战场先放在 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pressure_high'])}`，上方看 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['repair_confirm'])}` 是否站稳，下方看 `{fmt_price(plan['support'])}/{fmt_price(plan['low'])}` 是否再次失守。
 
-## 2. 数据状态与行情摘要
+## 2. {completed_title}总评
+
+{completed_title}从 `{fmt_price(session_summary['open'])}` 开始，最低 `{fmt_price(session_summary['low'])}`、最高 `{fmt_price(session_summary['high'])}`，最后收在 `{fmt_price(session_summary['close'])}`。结构上更接近“先验证边界，再回到中轴/压力区”的节奏，而不是单一方向的无条件延续。
+
+这说明：
+
+- 前序关键位 `{prior_levels_text}` 需要按“触发 + 确认”而不是“触碰即成立”来复盘。
+- 如果低点 `{fmt_price(session_summary['low'])}` 被打出后没有继续延续，则低位追空逻辑降级；如果高点 `{fmt_price(session_summary['high'])}` 附近不能继续站稳，则修复也不能直接当成趋势反转。
+- 本阶段持仓路径 `{oi_path}`，只能说明持仓增减和价格同向/背离关系，不能还原逐笔主动买卖。
+- 下一阶段不要在 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}` 中轴凭感觉来回切，应等 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 或 `{fmt_price(plan['support'])}/{fmt_price(plan['low'])}` 的边界确认。
+
+## 3. 数据状态与行情摘要
 
 | 项目 | 数值 |
 |---|---:|
 | quote 时间 | {fmt_dt(quote['quote_dt'])} |
 | quote 最新/收盘参考 | {fmt_price(quote['last'])} |
-| quote 日内最高 | {fmt_price(quote['high'])} |
-| quote 日内最低 | {fmt_price(quote['low'])} |
-| {completed_title}K线开盘参考 | {fmt_price(session_summary['open'])} |
-| {completed_title}K线最高 | {fmt_price(session_summary['high'])} |
-| {completed_title}K线最低 | {fmt_price(session_summary['low'])} |
-| {completed_title}K线收盘参考 | {fmt_price(session_summary['close'])} |
-| {completed_title}成交量合计 | {session_summary['volume']:.0f} |
-| {completed_title}持仓变化 | {fmt_price(session_summary['oi_delta'])} |
-| 本地监控样本 | {monitor_note} |
+| quote 日内最高 / 最低 | {fmt_price(quote['high'])} / {fmt_price(quote['low'])} |
+| {completed_title}K线开盘 / 最高 / 最低 / 收盘 | {fmt_price(session_summary['open'])} / {fmt_price(session_summary['high'])} / {fmt_price(session_summary['low'])} / {fmt_price(session_summary['close'])} |
+| 3m K线数量 | {len(session_rows_3m)} 根 |
+| 3m 成交量合计 | {fmt_volume(session_summary['volume'])} 手 |
+| 3m 持仓变化 | {fmt_oi_delta(session_summary['oi_delta'])} 手 |
+| 15m K线数量 | {len(session_rows_15m)} 根 |
+| 15m 区间 | {fmt_price(summarize_bars(session_rows_15m)['low'])}-{fmt_price(summarize_bars(session_rows_15m)['high'])} |
+| 本地监控样本 | {event_note} |
+| 本阶段主路径 | {fmt_dt(open_bar.dt if open_bar else None)} 开始，{fmt_dt(low_bar.dt if low_bar else None)} 附近见低点，{fmt_dt(high_bar.dt if high_bar else None)} 附近见高点，收 `{fmt_price(session_summary['close'])}` |
 
-## 3. 前序 STATE_HANDOFF 摘要
+{completed_title}结构可分为四段：
 
-```text
-{prior_handoff}
-```
+{segment_numbered}
 
 ## 4. 多周期结构总表
 
-| 周期 | 方向/结构 | 关键位 | 指标/量仓状态 | 交易含义 |
+| 周期 | 方向/结构 | 关键位 | 指标/量仓状态 | 对 {next_label} 的交易含义 |
 |---|---|---|---|---|
 {timeframe_md}
 
-## 5. 前序计划逐项验证（需人工补充）
+多周期结论：大周期先决定方向背景，小周期只决定入场和风控。当前最重要的不是判断一个绝对多空，而是确认 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['repair_confirm'])}` 能否继续收回，或 `{fmt_price(plan['support'])}/{fmt_price(plan['low'])}` 是否有效失守。
+
+## 5. 前序计划逐项验证
 
 | 前序方案 | 计划触发 | 实际路径 | 匹配状态 | 原因 | 执行含义 |
 |---|---|---|---|---|---|
-| 方案 A | 从前序计划补充 | 本次区间 {fmt_price(session_summary['low'])}-{fmt_price(session_summary['high'])} | 待复核 | 根据触发、回收、承压、量仓变化判断 | 不只看方向对错，要看触发质量 |
-| 方案 B | 从前序计划补充 | 本次收盘/最新 {fmt_price(session_summary['close'])} | 待复核 | 根据关键位是否有效跌破/站回判断 | 未触发也要记录，避免 hindsight bias |
-| 方案 C | 从前序计划补充 | 参考本地监控与K线节奏 | 待复核 | 公共数据无逐笔主动买卖 | 执行评价需与市场匹配度分开 |
+{validation_md}
 
-## 6. 时间维度预测 vs 实际验证（需人工补充）
+复盘结论：前序计划有效与否，不能只看方向是否最后走对，而要看触发链条是否完整。到位不等于触发，刺破不等于有效跌破，突破不等于趋势反转。
+
+## 6. 时间维度预测 vs 实际验证
 
 | 复盘维度 | 前序预测/计划 | 实际走势 | 相符度 | 偏差来源 | 下次修正 |
 |---|---|---|---|---|---|
-| 开盘 | 待补充 | 开盘参考 {fmt_price(session_summary['open'])} | 待复核 | 待补充 | 开盘首段优先观察 |
-| 前30分钟 | 待补充 | 结合3m/15m走势复核 | 待复核 | 待补充 | 破位/突破需确认 |
-| 主段 | 待补充 | 区间 {fmt_price(session_summary['low'])}-{fmt_price(session_summary['high'])} | 待复核 | 待补充 | 区分趋势延续与区间修复 |
-| 尾盘/收盘 | 待补充 | 收盘参考 {fmt_price(session_summary['close'])} | 待复核 | 待补充 | 收盘位置决定下一阶段中轴 |
-| 波动区间 | 待补充 | 实际区间 {fmt_price(session_summary['low'])}-{fmt_price(session_summary['high'])} | 待复核 | 待补充 | 保留假破/假突破判断 |
+{time_verify_md}
 
-## 7. 命中/偏差归因与逻辑修正（自动骨架）
+## 7. 命中/偏差归因与逻辑修正
 
 | 问题类型 | 本次表现 | 造成后果 | 后续规则 |
 |---|---|---|---|
-| 趋势惯性 | 自动判断 `{bias}`，需结合日K复核 | 可能把修复误当反转，或把趋势空执行得太机械 | 大周期定背景，小周期定入场 |
-| 关键位确认 | 支撑 `{fmt_price(levels['support'])}`，压力 `{fmt_price(levels['resistance'])}` | 单次触碰不能代表有效突破/跌破 | 看3m/15m收盘、反抽不过或回踩不破 |
-| 持仓解释 | 本阶段持仓变化 `{fmt_price(session_summary['oi_delta'])}` | 只能说明持仓增减，不能直接标注多开/空开 | 量仓结论必须写成推断而非逐笔事实 |
-| 执行颗粒 | 中轴区间易反复 | 高频碎单可能被震荡消耗 | 只在边界和确认位做决策 |
+| 趋势惯性 | 自动判断 `{bias}`，但具体执行仍要看边界确认 | 容易把大方向理解成任意位置可追 | 大周期定背景，小周期定入场；趋势空/趋势多都不能脱离位置 |
+| 关键位确认 | 本阶段低点 `{fmt_price(session_summary['low'])}`、高点 `{fmt_price(session_summary['high'])}` 都需要二次验证 | 单次触碰容易造成假破/假突破 | 看3m/15m收盘、反抽不过或回踩不破 |
+| 持仓解释 | 持仓路径 `{oi_path}` | 只能辅助判断回补/增仓倾向，不能写成逐笔事实 | 量仓结论必须写成推断，不标注主动买卖 |
+| 执行颗粒 | 中轴 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}` 容易反复 | 高频碎单会被手续费、滑点和假信号消耗 | 只在边界和确认位做决策 |
+| 超卖/过热 | 若低位已释放较多波动，继续追击的性价比下降 | 容易在尾段或极端位置被反向修复 | 越到极端位置，越要等反抽/回踩确认 |
 
 ## 8. 本地监控与盘面验证
 
-事件监控最近样本：
+本地监控样本摘要：{event_note}
 
 | 时间 | 价格 | 事件/状态 | 备注 |
 |---|---:|---|---|
-{event_md}
+{monitor_md}
 
-半小时简报最近样本：
+监控结论与K线应一起看：日志负责提示价格触发了什么位置，复盘负责判断触发后是否完成确认。没有逐笔主动买卖数据时，不把单条日志解释成主力行为。
 
-| 时间 | 价格 | 事件/状态 | 备注 |
-|---|---:|---|---|
-{briefing_md}
+## 9. 关键位变化表
 
-## 9. 关键位变化表（自动草稿）
-
-| 点位 | 当前角色 | 验证方式 | 下一阶段含义 |
+| 点位 | 当前角色 | 验证方式 | {next_label} 新角色 |
 |---:|---|---|---|
-| {fmt_price(levels['session_low'])} | 本阶段低点 | 跌破后能否收回 | 下方风险释放/假破观察 |
-| {fmt_price(levels['support'])} | 近端支撑 | 3m/15m是否有效跌破 | 跌破且反抽不过才偏弱 |
-| {fmt_price(levels['close'])} | 当前中轴 | 能否站稳/跌回 | 判断修复或转弱节奏 |
-| {fmt_price(levels['resistance'])} | 近端压力 | 冲高是否承压 | 承压转弱才考虑反向 |
-| {fmt_price(levels['upper_confirm'])} | 上方确认位 | 站稳/回踩不破 | 修复延续确认 |
+| {fmt_price(plan['low'])} | 本阶段低点/再破确认位 | 跌破后能否快速收回 | 有效跌破才看新低延续，快速收回则按假破处理 |
+| {fmt_price(plan['support'])} | 近端支撑/弱势确认线 | 3m/15m 是否有效跌破 | 跌破且反抽不过，修复逻辑降级 |
+| {fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])} | 当前中轴/多空拉锯区 | 能否站稳或跌回 | 中间区不追单，只等向边界移动 |
+| {fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])} | 近端压力/承压观察区 | 冲高是否承压，或站稳回踩不破 | 承压可看回落，站稳则修复延续 |
+| {fmt_price(plan['repair_confirm'])} | 修复延续确认位 | 站稳后是否回踩不破 | 站稳后停止死空，按修复延续处理 |
+| {fmt_price(plan['major_resistance'])} | 大级别修复门槛 | 能否有效收回 | 收回前不轻易改成趋势反转叙事 |
+| {fmt_price(plan['breakdown_target'])} | 下方延伸目标 | 支撑失守后是否触及 | 只在跌破确认后使用，不提前挂情绪单 |
 
-## 10. {next_date_text} {next_title}情景概率表（自动草稿，需人工复核）
+## 10. 对 {next_label_compact} 的影响
+
+本次收在 `{fmt_price(session_summary['close'])}`，短线中轴上移/下移到 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}`。{next_title}首先要验证这个中轴能否守住；若守住并继续收回 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['repair_confirm'])}`，说明修复延续；若跌回 `{fmt_price(plan['support'])}` 下方并反抽不过，说明本次修复被回吐。
+
+因此 {next_label} 的主策略应是：
+
+- 不在 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}` 中间位置凭感觉追单。
+- 上方看 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 是否承压，承压才考虑空。
+- 若站稳 `{fmt_price(plan['repair_confirm'])}`，停止死空，按修复延续或空头回补处理。
+- 下方看 `{fmt_price(plan['support'])}/{fmt_price(plan['low'])}` 是否重新失守，失守并反抽不过才重新偏弱。
+
+## 11. {next_label_compact}关键点位
+
+| 类型 | 点位 | 含义 |
+|---|---:|---|
+| 本阶段收盘/中轴 | {fmt_price(plan['close'])} | 下一阶段短线强弱第一观察点 |
+| 中轴区间 | {fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])} | 中间反复不交易，等边界触发 |
+| 近端压力 | {fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])} | 承压回落或修复延续的分水岭 |
+| 修复确认 | {fmt_price(plan['repair_confirm'])} | 站稳后空单逻辑降级 |
+| 大级别修复门槛 | {fmt_price(plan['major_resistance'])} | 未站回前不把修复当反转 |
+| 近端支撑 | {fmt_price(plan['support'])} | 跌破后看修复是否失败 |
+| 本阶段低点 | {fmt_price(plan['low'])} | 再破后必须等反抽不过确认 |
+| 下方延伸 | {fmt_price(plan['breakdown_target'])} | 有效跌破后的第一目标区 |
+| 极弱延伸 | {fmt_price(plan['extreme_target'])} | 只有放量/增仓跌破后才看 |
+
+## 12. {next_label_compact}情景概率表
 
 | 剧本 | 触发条件 | 预期路径 | 估计概率 | 关键证据 | 失效条件 |
 |---|---|---|---:|---|---|
-| A：压力位承压回落 | 反抽到 {fmt_price(levels['resistance'])}-{fmt_price(levels['upper_confirm'])} 后3m转弱 | 回看 {fmt_price(levels['close'])}，再看 {fmt_price(levels['support'])} | 30%-40% | 压力区未站稳 | 站稳 {fmt_price(levels['upper_confirm'])} |
-| B：上方确认后的修复延续 | 站稳 {fmt_price(levels['upper_confirm'])} 且回踩不破 | 上看更高一级压力，人工补充 | 25%-35% | 修复/突破得到确认 | 跌回 {fmt_price(levels['resistance'])} 下方 |
-| C：跌破支撑后的弱势延续 | 跌破 {fmt_price(levels['support'])} 且反抽不过 | 回看 {fmt_price(levels['lower_confirm'])} 附近 | 25%-35% | 支撑失守且未收回 | 快速收回 {fmt_price(levels['support'])} |
-| D：中轴震荡无交易 | 价格在 {fmt_price(levels['support'])}-{fmt_price(levels['resistance'])} 内反复 | 观望 | — | 空间不足、触发不清 | 突破或跌破边界并确认 |
+| A：{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])} 承压回落 | 反抽到压力区后3m转弱，不能站稳 `{fmt_price(plan['repair_confirm'])}` | 回看 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}`，再看 `{fmt_price(plan['support'])}` | {pct_range(32, 42)} | 大周期压力仍在，修复后第一压力区容易反复 | 站稳 `{fmt_price(plan['repair_confirm'])}` |
+| B：{fmt_price(plan['repair_confirm'])} 修复延续 | 站稳确认位，并回踩 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 不破 | 上看 `{fmt_price(plan['major_resistance'])}`，再看更高压力 | {pct_range(24, 34)} | 本阶段若已低位收回，继续修复有回补空间 | 跌回 `{fmt_price(plan['pivot_low'])}` 下方 |
+| C：跌回 `{fmt_price(plan['support'])}` 后修复失败 | 跌破支撑，反抽 `{fmt_price(plan['pivot_low'])}` 不过 | 回看 `{fmt_price(plan['low'])}`，再看 `{fmt_price(plan['breakdown_target'])}` | {pct_range(24, 32)} | 中轴失守说明修复被回吐 | 重新站回 `{fmt_price(plan['pivot_high'])}` |
+| D：`{fmt_price(plan['low'])}` 再破新低 | 跌破本阶段低点后反抽不过 | 看 `{fmt_price(plan['breakdown_target'])}`，极弱看 `{fmt_price(plan['extreme_target'])}` | {pct_range(16, 24)} | 低点失守会重新释放下行风险 | 跌破后快速收回 `{fmt_price(plan['support'])}` |
+| E：无交易区间 | 价格在 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pressure_low'])}` 内反复 | 观望 | — | 空间不足、触发不清 | 突破或跌破边界并确认 |
 
-## 11. 操作计划（自动骨架）
+概率只用于比较剧本优先级，不是统计承诺。若价格一直在中轴内反复，没有必要为了交易而交易。
 
-### 方案 A：压力承压后的空
+## 13. {next_label_compact}方案 A：{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])} 承压后的空
+
+适用场景：价格反抽 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}`，但不能站稳，3m 出现冲高回落，15m 没有继续抬高。
 
 | 项目 | 计划 |
 |---|---|
 | 方向 | 反抽承压空 |
-| 入场区 | {fmt_price(levels['resistance'])}-{fmt_price(levels['upper_confirm'])} 承压后，3m转弱再考虑 |
-| 仓位 | 1手基础；确认后才考虑加仓 |
-| 止损 | {fmt_price(levels['upper_confirm'] + 8)} 上方或重新站稳确认位 |
-| 第一止盈 | {fmt_price(levels['close'])} |
-| 第二止盈 | {fmt_price(levels['support'])} |
-| 主要风险 | 若上方确认位站稳，继续空容易被修复延续挤压 |
+| 入场区 | `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 承压后，3m 转弱再考虑 |
+| 仓位 | 1 手基础；只有跌回中轴且反抽不过时再考虑加到 2 手 |
+| 止损 | `{fmt_price(plan['repair_confirm'])}` 上方；若站稳确认位，空单逻辑降级 |
+| 第一止盈 | `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}` |
+| 第二止盈 | `{fmt_price(plan['support'])}` |
+| 估计概率 | {pct_range(32, 42)} |
+| 依据 | 大周期压力未解除，压力区承压仍是顺背景交易 |
+| 主要风险 | 若确认位被收回，继续空容易被修复延续挤压 |
 
-### 方案 B：上方确认后的修复延续
+执行要点：不要在 `{fmt_price(plan['close'])}` 附近直接开空；必须等压力区承压和3m转弱。若价格没有到压力区或没有转弱，本方案不成立。
 
-| 项目 | 计划 |
-|---|---|
-| 方向 | 修复多/空头回补延续 |
-| 入场区 | {fmt_price(levels['upper_confirm'])} 站稳回踩不破后再考虑 |
-| 仓位 | 1手；趋势未确认前不加大仓位 |
-| 止损 | 跌回 {fmt_price(levels['resistance'])} 下方 |
-| 第一止盈 | 人工补充上方压力 |
-| 主要风险 | 大周期若仍弱，修复多不能当趋势反转 |
+## 14. {next_label_compact}方案 B：跌回 `{fmt_price(plan['support'])}` 后的弱势回吐
 
-### 方案 C：跌破支撑后的弱势延续
+适用场景：价格跌回 `{fmt_price(plan['support'])}` 下方，且反抽 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}` 不能重新站回。
 
 | 项目 | 计划 |
 |---|---|
-| 方向 | 支撑失守后的延续空 |
-| 入场区 | 跌破 {fmt_price(levels['support'])} 后，反抽不过再考虑 |
-| 仓位 | 1手；不追第一根急跌 |
-| 止损 | 重新站回 {fmt_price(levels['support'])} 或 {fmt_price(levels['close'])} |
-| 第一止盈 | {fmt_price(levels['lower_confirm'])} |
-| 主要风险 | 低位假破后快速收回 |
+| 方向 | 修复失败后的回吐空 |
+| 入场区 | 跌回 `{fmt_price(plan['support'])}` 后，反抽中轴不过再考虑 |
+| 仓位 | 1 手；不追第一根急跌 |
+| 止损 | `{fmt_price(plan['pivot_high'])}-{fmt_price(plan['pressure_low'])}`；重新站回中轴后逻辑降级 |
+| 第一止盈 | `{fmt_price(plan['low'])}` |
+| 第二止盈 | `{fmt_price(plan['breakdown_target'])}` |
+| 估计概率 | {pct_range(24, 32)} |
+| 依据 | 中轴/支撑失守说明本阶段修复被否定 |
+| 主要风险 | 低位已经验证过容易出现假破，必须等反抽不过 |
 
-## 12. 小资金点数现实与风险可行性
+执行要点：这不是追空方案，而是“修复失败确认”方案。只有跌回支撑且反抽不过，才说明本阶段修复被否定。
 
-PVC期货每手5吨，价格每波动1点约5元/手。下面不是收益承诺，只用于判断目标是否现实。
+## 15. {next_label_compact}方案 C：站稳 `{fmt_price(plan['repair_confirm'])}` 的修复延续
 
-| 目标盈亏 | 1手所需点数 | 2手所需点数 | 3手所需点数 | 当前行情可行性 | 建议姿态 |
+适用场景：价格站稳 `{fmt_price(plan['repair_confirm'])}`，并且回踩 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 不破，15m 低点继续抬高。
+
+| 项目 | 计划 |
+|---|---|
+| 方向 | 修复多 / 空头回补延续 |
+| 入场区 | `{fmt_price(plan['repair_confirm'])}` 站稳回踩不破，或压力区被收回后再确认 |
+| 仓位 | 1 手；趋势未反转前不加大仓位 |
+| 止损 | 跌回 `{fmt_price(plan['pressure_low'])}` 下方，或重新失守中轴 |
+| 第一止盈 | `{fmt_price(plan['major_resistance'])}` |
+| 第二止盈 | `{fmt_price(plan['major_resistance'] + 20)}` 附近 |
+| 估计概率 | {pct_range(24, 34)} |
+| 依据 | 若确认位继续收回，说明回补/修复还有延续空间 |
+| 主要风险 | 大周期压力仍在，不能把修复多当趋势反转 |
+
+执行要点：多单只做修复，不定义趋势反转。到 `{fmt_price(plan['major_resistance'])}` 必须保护利润；只有继续站稳后，才看更高一档。
+
+## 16. {next_label_compact}方案 D：`{fmt_price(plan['low'])}` 再次跌破后的新低延续
+
+适用场景：价格重新跌破本阶段低点 `{fmt_price(plan['low'])}`，且反抽 `{fmt_price(plan['low'])}-{fmt_price(plan['support'])}` 不能收回。
+
+| 项目 | 计划 |
+|---|---|
+| 方向 | 新低延续空 |
+| 入场区 | 跌破 `{fmt_price(plan['low'])}` 后，反抽 `{fmt_price(plan['low'])}-{fmt_price(plan['support'])}` 不过再考虑 |
+| 仓位 | 1 手；不建议第一根破位重仓追 |
+| 止损 | 重新站回 `{fmt_price(plan['support'])}` 或 `{fmt_price(plan['pivot_low'])}` |
+| 第一止盈 | `{fmt_price(plan['breakdown_target'])}` |
+| 第二止盈 | `{fmt_price(plan['extreme_target'])}` |
+| 估计概率 | {pct_range(16, 24)} |
+| 依据 | 本阶段低点若被有效跌破，说明修复失败并重新释放下行风险 |
+| 主要风险 | 连续下探后低位假破概率高，必须等反抽不过确认 |
+
+执行要点：这条方案的纪律最重要。低位刺破很容易快速收回，因此必须等跌破后的反抽确认。
+
+## 17. 方案优先级
+
+| 优先级 | 方案 | 触发条件 | 评价 |
+|---:|---|---|---|
+| 1 | 方案 A：压力区承压空 | 到 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 后3m转弱 | 顺大背景，但必须防止修复延续 |
+| 2 | 方案 C：确认位修复延续 | 站稳 `{fmt_price(plan['repair_confirm'])}` | 适合处理低位收回后的继续回补 |
+| 3 | 方案 B：支撑跌回后的回吐空 | 跌回 `{fmt_price(plan['support'])}` 且反抽不过 | 用于确认本阶段修复失败 |
+| 4 | 方案 D：低点再破新低 | 跌破后反抽不过 `{fmt_price(plan['low'])}-{fmt_price(plan['support'])}` | 有效但低位追空风险最高 |
+
+{next_label}最不应该做的是在 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}` 中间位置凭感觉来回切。这个区间是当前中轴，必须等价格去触碰边界：上方 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['repair_confirm'])}` 或下方 `{fmt_price(plan['support'])}/{fmt_price(plan['low'])}`。
+
+## 18. 小资金点数现实与风险可行性
+
+PVC 期货每手 5 吨，价格每波动 1 点约 5 元/手。下面不是收益承诺，只用于判断“目标是否现实”。
+
+| 目标盈亏 | 1 手所需点数 | 2 手所需点数 | 3 手所需点数 | 当前行情可行性 | 建议姿态 |
 |---|---:|---:|---:|---|---|
-| 100元 | 20点 | 10点 | 约7点 | 边界触发后较现实 | 到位先保护 |
-| 200元 | 40点 | 20点 | 约14点 | 需要从支撑/压力边界入场 | 不在中轴追单 |
-| 300元 | 60点 | 30点 | 20点 | 需要完整波段配合 | 等确认，不碎单 |
-| 500元 | 100点 | 50点 | 约34点 | 难度较高，易诱导重仓 | 不建议作为单日硬目标 |
+| 100 元 | 20 点 | 10 点 | 约 7 点 | 边界触发后较现实 | 到位先保护，不恋战 |
+| 200 元 | 40 点 | 20 点 | 约 14 点 | 需要从压力/支撑边界入场 | 只做 A/C/B 的确认触发 |
+| 300 元 | 60 点 | 30 点 | 20 点 | 需要完整波段配合 | 不在中轴追单 |
+| 500 元 | 100 点 | 50 点 | 约 34 点 | 当日难度较高，容易诱导重仓 | 不建议作为单日硬目标 |
 
-## 13. 最终执行口径（自动草稿）
+若账户规模较小，日内更应把“控制单笔亏损”放在“赚回亏损”前面。当前更合理的目标不是硬赚固定比例，而是等清晰触发后做 20-40 点的可控波段；若只在中轴内震荡，观望优于碎单。
 
-- `{fmt_price(levels['resistance'])}-{fmt_price(levels['upper_confirm'])}` 承压转弱：按反抽承压空观察。
-- `{fmt_price(levels['upper_confirm'])}` 站稳：停止死空，按修复延续观察。
-- `{fmt_price(levels['support'])}` 跌破且反抽不过：才按弱势延续处理。
-- `{fmt_price(levels['support'])}-{fmt_price(levels['resistance'])}` 中轴反复：观望优先，避免碎单。
+## 19. {next_label_compact}执行纪律
+
+1. `{fmt_price(plan['low'])}` 若再次跌破，必须等反抽不过，不能第一根追。
+2. `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}` 是短线中轴，不是无脑开仓点。
+3. `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 只有承压转弱才空，站稳则空单降级。
+4. `{fmt_price(plan['repair_confirm'])}` 是修复延续确认位；站稳后不要继续死空。
+5. 所有空单第一目标先看中轴或近端支撑，到位必须保护，不把短线空变成趋势幻想。
+6. 所有多单只按“修复/回补”处理，`{fmt_price(plan['major_resistance'])}` 未站稳前不说趋势反转。
+
+## 20. 最终执行口径
+
+{completed_label}给出的核心信息是：价格在 `{fmt_price(session_summary['low'])}-{fmt_price(session_summary['high'])}` 完成一次边界验证，收在 `{fmt_price(session_summary['close'])}`。所以 {next_label} 不适合简单沿用单方向追击模式，而应围绕 `{fmt_price(plan['support'])}`、`{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}`、`{fmt_price(plan['pressure_low'])}-{fmt_price(plan['repair_confirm'])}` 做条件化执行。
+
+按三句话执行：
+
+- `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])} 承压转弱`：可以考虑反抽空，先看 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}`，再看 `{fmt_price(plan['support'])}`。
+- `{fmt_price(plan['repair_confirm'])} 站稳`：停止死空，按修复延续处理，先看 `{fmt_price(plan['major_resistance'])}`。
+- `{fmt_price(plan['low'])} 再破且反抽不过`：才看新低延续；如果跌破后又快速收回，继续按假破处理。
+
+没有触发就休息。当前位置真正的风险不是只看错大方向，而是在边界没有确认前把逻辑执行得太机械。
 
 ```text
 STATE_HANDOFF
@@ -535,27 +886,35 @@ source_doc: {source_doc}
 session_completed: {args.session}
 next_session: {next_session}
 bias: {bias}
-risk_flags: auto_generated, needs_human_review, one_level_quote_only, no_tick_active_flow
+risk_flags: {risk_flags}
 must_watch_levels:
-  - price: {fmt_price(levels['support'])}
+  - price: {fmt_price(plan['low'])}
     role: support
-    label: 近端支撑/跌破确认位
-    trigger: break_down_or_reclaim
-  - price: {fmt_price(levels['resistance'])}
+    label: 本阶段低点/再破确认位
+    trigger: break_down_or_false_break_reclaim
+  - price: {fmt_price(plan['support'])}
+    role: weakness_confirmation
+    label: 近端支撑/修复失败观察
+    trigger: lose_or_reclaim
+  - price: {fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}
+    role: midline
+    label: 当前短线中轴
+    trigger: hold_or_reject
+  - price: {fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}
     role: resistance
-    label: 近端压力/承压观察位
+    label: 压力区/承压观察
     trigger: rejection_or_break_up
-  - price: {fmt_price(levels['upper_confirm'])}
+  - price: {fmt_price(plan['repair_confirm'])}
     role: repair_confirmation
     label: 修复延续确认位
     trigger: break_up_or_fail
-  - price: {fmt_price(levels['lower_confirm'])}
-    role: breakdown_target
-    label: 下方延续观察位
-    trigger: reach_or_reclaim
+  - price: {fmt_price(plan['major_resistance'])}
+    role: major_resistance
+    label: 大级别修复门槛
+    trigger: reclaim_or_fail
 invalidated_levels:
-  - price: TBD
-    reason: 人工复核前序计划后补充
+  - price: {prior_mentions[0] if prior_mentions else 'TBD'}
+    reason: 若已被本阶段刺破/收回，单独作为触发信号权重下降，需结合确认链使用
 monitor_levels_updated: {str(args.update_levels).lower()}
 ```
 """
@@ -566,14 +925,15 @@ monitor_levels_updated: {str(args.update_levels).lower()}
         "updated_at": generated_at.isoformat(),
         "session": next_session,
         "levels": [
-            {"price": round(levels["support"]), "role": "support", "label": "近端支撑/跌破确认位", "direction": "both"},
-            {"price": round(levels["resistance"]), "role": "resistance", "label": "近端压力/承压观察位", "direction": "both"},
-            {"price": round(levels["upper_confirm"]), "role": "repair_confirmation", "label": "修复延续确认位", "direction": "up"},
-            {"price": round(levels["lower_confirm"]), "role": "breakdown_target", "label": "下方延续观察位", "direction": "down"},
+            {"price": round(plan["low"]), "role": "support", "label": "本阶段低点/再破确认位", "direction": "down"},
+            {"price": round(plan["support"]), "role": "weakness_confirmation", "label": "近端支撑/修复失败观察", "direction": "both"},
+            {"price": round(plan["pivot_low"]), "role": "midline_low", "label": "短线中轴下沿", "direction": "both"},
+            {"price": round(plan["pressure_low"]), "role": "resistance", "label": "压力区下沿/承压观察", "direction": "both"},
+            {"price": round(plan["repair_confirm"]), "role": "repair_confirmation", "label": "修复延续确认位", "direction": "up"},
+            {"price": round(plan["major_resistance"]), "role": "major_resistance", "label": "大级别修复门槛", "direction": "up"},
         ],
     }
     return markdown, prediction_payload
-
 
 def format_monitor_record(record: dict) -> str:
     stamp = None

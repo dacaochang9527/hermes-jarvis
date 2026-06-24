@@ -61,7 +61,7 @@ Current PVC2609 cron scripts:
 - `pvc2609_preopen_guard.py`: no-agent pre-open guard; runs at 08:50 on trading days and prints a Feishu-ready readiness report covering config, cron registration, quote/K-line availability, and local state-file sanity.
 - `pvc2609_event_monitor.py`: no-agent event monitor; runs frequently during trading hours and prints only when an event should be pushed. It reads `runtime/pvc2609_feishu_monitor/latest_prediction_levels.json` on each tick so predicted key levels from the latest plan override stale hardcoded levels.
 - `pvc2609_half_hour_briefing.py`: no-agent briefing monitor; cron may run every 5 minutes, but the script enforces an approximately 25-30 minute send cooldown during trading sessions. It also reads `latest_prediction_levels.json` so fixed-interval briefing support/resistance follows the latest forecast.
-- `pvc2609_generate_session_report.py`: local Markdown report generator; fetches Sina quote/K-lines, reads monitor logs, and creates the upgraded day/night review + next-session plan skeleton with multi-timeframe summary, scenario validation placeholders, time-slice forecast-vs-actual table, small-account risk table, and `STATE_HANDOFF`. By default it avoids overwriting existing reports by writing a timestamped draft; use `--overwrite` for a canonical report and `--update-levels` only after the plan has been reviewed.
+- `pvc2609_generate_session_report.py`: local Markdown report generator; fetches Sina quote/K-lines, reads monitor logs, and creates a near-complete 20-section day/night review + next-session plan draft aligned with `reports/pvc2609_20.md`, including multi-timeframe summary, prior-plan validation, time-slice forecast-vs-actual, scenario plans, small-account risk table, and `STATE_HANDOFF`. By default it avoids overwriting existing reports by writing a timestamped draft; use `--overwrite` for a canonical report and `--update-levels` only after the plan has been reviewed.
 
 For PVC2609, use:
 
@@ -94,8 +94,23 @@ Known limitations:
    - support breaks and retest fails → possible breakdown short;
    - no trigger → observe.
 6. For every scenario, include entry zone, stop loss, take profit, estimated probability, basis, invalidation condition, and position-size caveat.
-7. For PVC2609 day/night reports, prefer bootstrapping with `python pvc2609_generate_session_report.py --date YYYYMMDD --session day|night`; review and complete the generated placeholders before treating the document as final. Add `--overwrite` only when replacing the canonical report, and add `--update-levels` only after the forecast levels are accepted.
+7. For PVC2609 day/night reports, first bootstrap with `python pvc2609_generate_session_report.py --date YYYYMMDD --session day|night`; review and revise the generated full draft before treating the document as final. Add `--overwrite` only when replacing the canonical report, and add `--update-levels` only after the plan has been reviewed.
 8. If saving to Markdown, write under `~/.hermes/skills/finance/futures-trading-assistant/reports/` unless the user specifies another path.
+
+### PVC2609 复盘落盘纪律（用户纠正后固化）
+
+当用户要求“日盘/夜盘复盘、先落盘本地、生成报告、发布飞书、发群”等 PVC2609 复盘类任务时，不要直接手写 canonical Markdown。必须先运行固化脚本生成接近完整成稿的 20 节草稿，再人工复核补全/修正：
+
+```bash
+python pvc2609_generate_session_report.py --date YYYYMMDD --session day|night
+```
+
+- 质量门槛：生成草稿应尽量接近 `reports/pvc2609_20.md` 的完整成稿形态，目标约 20 个二级章节，覆盖一句话结论、总评、行情摘要、四段分时复盘、多周期表、前序方案逐项验证、时间维度验证、命中/偏差归因、本地监控、关键位变化、次时段影响、关键点位、情景概率、A/B/C/D 方案、优先级、小资金点数现实、执行纪律、最终口径和 `STATE_HANDOFF`。若脚本输出只有骨架、大片“待补充/需人工补充”，应优先修脚本，而不是接受骨架作为流程完成。
+- 若 canonical 文件已存在且不确定是否可覆盖，先用 `--output reports/<name>.script_draft.md` 生成脚本草稿，不要直接 `--overwrite`.
+- 正式文件顶部应注明生成方式：先由 `pvc2609_generate_session_report.py` 自动生成完整草稿，再人工复核修正前序计划验证、分时复盘、关键位与下一交易时段方案。
+- 人工复核时以脚本完整草稿为基底，校正前序计划逐项验证、时间维度预测 vs 实际、监控日志样本、关键位变化、`STATE_HANDOFF`，而不是另起一份纯手工文档，也不要退回只有章节占位的骨架。
+- 监控日志样本必须二次核对真实 `runtime/pvc2609_feishu_monitor/events.jsonl` 与 `half_hour_briefings.jsonl`。如果生成器把样本写成 0、暂无或与日志明显不一致，应先人工补入第 3/8 节，再发布飞书文档；不能把缺失监控验证的报告当成完成。
+- 如果因流程偏差先手写了报告，应立即补跑脚本生成 draft，并把正式文件改造成“脚本完整草稿 + 人工复核修正”版本，保留 draft 作为追溯依据。
 
 ## Mandatory Day/Night State Chain
 
