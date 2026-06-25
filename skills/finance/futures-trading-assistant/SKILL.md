@@ -48,7 +48,7 @@ Trading-session changes for Feishu futures monitors, including day + night cron/
 
 Pre-open guard check design is documented in `references/preopen-guard-checks.md`.
 
-Local Markdown report to Feishu online document publishing workflow is documented in `references/feishu-report-publishing.md`.
+Local Markdown report to Feishu online document publishing workflow is documented in `references/feishu-report-publishing.md`. Feishu API limits and workarounds (1000-block cap, chunking failures, pre-conversion trimming) are documented in `references/feishu-publishing-limits.md`.
 
 Reusable futures report structure benchmarks, including time-slice forecast-vs-actual tables, error/logic-adjustment tables, top-down multi-timeframe summaries, and small-account point feasibility, are documented in `references/report-structure-benchmarks.md`.
 
@@ -107,9 +107,15 @@ python pvc2609_generate_session_report.py --date YYYYMMDD --session day|night
 
 - 质量门槛：生成草稿应尽量接近 `reports/pvc2609_20.md` 的完整成稿形态，目标约 20 个二级章节，覆盖一句话结论、总评、行情摘要、四段分时复盘、多周期表、前序方案逐项验证、时间维度验证、命中/偏差归因、本地监控、关键位变化、次时段影响、关键点位、情景概率、A/B/C/D 方案、优先级、小资金点数现实、执行纪律、最终口径和 `STATE_HANDOFF`。若脚本输出只有骨架、大片“待补充/需人工补充”，应优先修脚本，而不是接受骨架作为流程完成。
 - 若 canonical 文件已存在且不确定是否可覆盖，先用 `--output reports/<name>.script_draft.md` 生成脚本草稿，不要直接 `--overwrite`.
-- 正式文件顶部应注明生成方式：先由 `pvc2609_generate_session_report.py` 自动生成完整草稿，再人工复核修正前序计划验证、分时复盘、关键位与下一交易时段方案。
-- 人工复核时以脚本完整草稿为基底，校正前序计划逐项验证、时间维度预测 vs 实际、监控日志样本、关键位变化、`STATE_HANDOFF`，而不是另起一份纯手工文档，也不要退回只有章节占位的骨架。
+- 正式文件顶部应注明生成方式：先由 `pvc2609_generate_session_report.py` 自动生成接近完整成稿的 20 节草稿，再人工复核修正前序计划验证、分时复盘、关键位与下一交易时段方案。
+- 人工复核时以脚本完整草稿为基底，校正前序计划逐项验证、时间维度预测 vs 实际、监控日志样本、关键位变化、`STATE_HANDOFF`，而不是另起一份纯手工文档，也不要退回大片“待补充/自动骨架”占位。
 - 监控日志样本必须二次核对真实 `runtime/pvc2609_feishu_monitor/events.jsonl` 与 `half_hour_briefings.jsonl`。如果生成器把样本写成 0、暂无或与日志明显不一致，应先人工补入第 3/8 节，再发布飞书文档；不能把缺失监控验证的报告当成完成。
+- 生成器已知 bug 防范清单（每次复盘复核时逐项检查）：
+  1. **Section 3 监控样本数**：生成器经常写 `0 条`，应从 `events.jsonl` / `half_hour_briefings.jsonl` 提取真实计数。events.jsonl 非常大，用 tail 取尾段按日期过滤；half_hour_briefings.jsonl 较小，逐条过滤当日。
+  2. **Section 5 前序验证表**：生成器倾向给所有方案填一样的占位文本（如"部分触发但延续失败"），应改为每个方案独立交叉验证 —— 写清楚是否触发、触发时价格、是否确认、是否失败。状态词用：触发且确认、午后触发、未触发、部分触发、触发后失败。
+  3. **Section 8 监控样本表**：当生成器输出"暂无/无本地样本"时，用 half_hour_briefings 的 price+levels 按时间排列表格，再取 events.jsonl 中 A 级 event（event_key/support_break/prediction_level_break 等）插入表格，标注 trigger_reason 和 oi_delta。
+  4. **STATE_HANDOFF**：检查 must_watch_levels 是否有重复 price 条目（如 4460 出现两次不同 role），检查前序计划来源 doc 是否正确。
+  5. **一句话结论**：确认不含占位符/错写（如 "4460/4460"），确认包含今日实际高低点和核心叙事。
 - 如果因流程偏差先手写了报告，应立即补跑脚本生成 draft，并把正式文件改造成“脚本完整草稿 + 人工复核修正”版本，保留 draft 作为追溯依据。
 
 ## Mandatory Day/Night State Chain
@@ -225,6 +231,8 @@ Avoid language like:
 3. Chasing low-position shorts during RSI extreme oversold. Add confirmation such as failed rebound or broken support retest.
 4. Designing a 5% profit target without explaining required points and contract count.
 5. Providing only one direction. Futures planning should include both long and short trigger conditions unless user explicitly asks for one side.
+6. Sending >1000 blocks to the Feishu descendant API. The endpoint rejects large payloads; pre-trim the markdown (remove STATE_HANDOFF + optional sections like 小资金点数) before conversion to stay under the limit. Multi-call chunking does not work. See `references/feishu-publishing-limits.md`.
+7. Publishing a review report where the monitor loaded stale prediction levels from a prior plan. The monitor reads `latest_prediction_levels.json` at startup; if a new plan was generated but not deployed before the monitor started, alerts fire against old levels. Run `--update-levels` on the reviewed plan before the next session's monitor starts. If the gap cannot be closed, note the discrepancy in the review's Section 7.
 
 ## Verification Checklist
 

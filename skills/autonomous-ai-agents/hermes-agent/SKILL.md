@@ -220,6 +220,23 @@ hermes insights [--days N]  Usage analytics
 hermes update               Update to latest version
 hermes pairing list/approve/revoke  DM authorization
 hermes plugins list/install/remove  Plugin management
+```
+
+### Updating Hermes Safely
+
+When upgrading a live Hermes install that runs gateway or cron monitoring jobs, treat the scheduler and delivery path as production infrastructure.
+
+1. Check the current version, target release, active gateway status, active cron jobs, and relevant release notes before recommending an upgrade.
+2. If cron jobs deliver market/monitoring alerts, avoid active monitoring windows; prefer after the trading/session window ends.
+3. Back up `~/.hermes/config.yaml`, `~/.hermes/skills/`, and any profile-specific config before `hermes update`, especially when `updates.pre_update_backup` is false.
+4. Remember that `no_agent=True` cron jobs primarily depend on their script plus scheduler/gateway delivery, so the main risks are config migration, cron ticking, launchd/systemd service health, and platform send APIs rather than LLM behavior.
+5. After updating, verify `hermes --version`, `hermes config check`, `hermes gateway status`, `hermes cron status`, `hermes cron list`, recent `~/.hermes/logs/gateway.log`, and one explicit platform test send if alerts matter.
+6. If service restart commands are blocked by approvals, tell the user the exact terminal command to run manually instead of claiming restart succeeded.
+
+### In-Session Model Switching
+
+In recent Hermes versions, `hermes model` is the interactive CLI picker and may not accept session-scoped flags. Session-scoped switching is an in-chat slash command: use `/model <provider/model> --session` when supported by the running version. To start or resume a session with a model from the shell, use `hermes chat --resume <session> --model <model>` or the global resume flags supported by that version.
+```
 hermes honcho setup/status  Honcho memory integration (requires honcho plugin)
 hermes memory setup/status/off  Memory provider config
 hermes completion bash|zsh  Shell completions

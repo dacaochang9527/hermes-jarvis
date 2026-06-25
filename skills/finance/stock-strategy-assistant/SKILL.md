@@ -20,6 +20,7 @@ metadata:
 当用户希望讨论、设计或实现以下系统时加载本 skill：
 
 - 选股助手、股票监控、买卖信号提醒；
+- 集合竞价、开盘前/开盘后监控、行业/板块强弱汇总；
 - A 股/港股/美股的中短线、波段、事件交易、量化筛选；
 - 把口头战法/朋友策略/图片策略规则化；
 - 回测某个选股策略或验证正反案例；
@@ -63,6 +64,12 @@ references/tulong-current-rules.md
 
 ```text
 references/tulong-operations.md
+```
+
+当用户要求把 D3/复盘/题材概率等股票报告“落盘 Markdown、生成飞书文档、发链接”，或明确说“参考期货那边的方式”时，加载：
+
+```text
+references/tulong-feishu-report-publishing.md
 ```
 
 当用户发送当天买卖/成交截图，要求"整理到交易文档/交易流水/持仓记录"时，加载：

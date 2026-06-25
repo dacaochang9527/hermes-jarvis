@@ -91,6 +91,7 @@ MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv
 15:10-15:30  收盘复盘，生成 D3 表现、HOLD 续期、次日新 D3 观察
 08:50        preopen_rotate_watchlist 写入今日 active 池
 09:05        preopen_guard_check 校验 active 池
+09:26        auction_summary 输出集合竞价后行业/板块汇总
 09:25-15:00  watchdog 只使用已校验 active 池
 ```
 
@@ -117,7 +118,7 @@ MMDDD3_negative_adjusted_watch_scan_YYYYMMDD_HHMMSS.csv
 - 09:25 quote 能代表开盘/集合竞价附近结果，但不包含完整竞价盘口字段，例如未匹配量、委托队列、竞价量比、竞价强弱评分。
 - 若用户问“集合竞价对今天走势有什么影响”，不要只讲概念；要把 09:25 首轮记录与后续盘中事件/快照对比，按票输出：竞价强弱、是否进买点区、是否高开低走/低开承接、是否回收观察价或跌破成本线。
 - 判断语言保持信号化：集合竞价是“开盘资金态度”，不是全天结论；结合 09:30–10:00 承接验证后再分为“低开有承接 / 冲高回落 / 弱开弱走 / HOLD成本线压力”。
-- 如果用户需要每天固定看竞价，应新增一个 09:25 集合竞价汇总输出：即使无告警，也列出 active 与 HOLD 的竞价涨跌幅、竞价额/成交额、是否进入买点区、是否低于成本线；不要依赖普通告警触发才让用户看到竞价结果。
+- 如果用户需要每天固定看竞价，应新增一个 09:25 集合竞价汇总输出：即使无告警，也列出 active 与 HOLD 的竞价涨跌幅、竞价额/成交额、是否进入买点区、是否低于成本线；不要依赖普通告警触发才让用户看到竞价结果。当前已落地为 `scripts/tulong/runtime/auction_summary.py`，由 `~/.hermes/scripts/tulong_auction_summary.sh` 在 09:26 调用，输出按行业/板块聚合并保存 `reports/alerts/tulong_auction_summary_YYYYMMDD.csv`。
 
 ## 盘中提醒
 

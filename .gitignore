@@ -58,6 +58,10 @@ skills/.hub/
 skills/.bundled_manifest
 skills/.curator_state
 
+# --- Python bytecode (repo-wide) ---
+__pycache__/
+*.py[cod]
+
 # --- Python & heavy deps under hermes-agent ---
 hermes-agent/venv/
 hermes-agent/.venv/

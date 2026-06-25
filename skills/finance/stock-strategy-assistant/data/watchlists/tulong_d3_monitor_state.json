@@ -1,67 +1,48 @@
 {
   "last_prices": {
-    "002367": 6.58,
-    "002386": 6.09,
-    "603661": 33.91,
-    "603065": 18.39,
-    "600791": 10.68,
-    "000012": 4.62,
-    "600183": 177.3,
-    "600769": 20.49
+    "600488": 4.69,
+    "002522": 8.01,
+    "002374": 3.51,
+    "002728": 8.55,
+    "603669": 5.61,
+    "600881": 1.6,
+    "600183": 187.2,
+    "600769": 21.51
   },
   "pending_snapshot": null,
-  "last_event_run_at": "2026-06-24T14:59:33",
+  "last_event_run_at": "2026-06-25T14:59:43",
   "watchlist_source": [
-    "0624D3_watch_scan_20260624_000337.csv",
+    "0625D3_watch_scan_20260625_005818.csv",
     "data/trades/tulong_trades.csv"
   ],
-  "watch_date": "2026-06-24",
+  "watch_date": "2026-06-25",
   "stages": [
-    "0624D3",
+    "0625D3",
     "HOLD"
   ],
   "pool_types": [
     "position",
     "watch"
   ],
-  "updated_at": "2026-06-24T08:50:50",
+  "updated_at": "2026-06-25T08:50:11",
   "filtered_out": [
-    "600345 长江通信 pool_subtype=radar_not_rotated",
-    "000571 新大洲A pool_subtype=radar_not_rotated",
-    "603607 京华激光 pool_subtype=radar_not_rotated",
-    "002830 名雕股份 pool_subtype=radar_not_rotated",
-    "002672 东江环保 pool_subtype=radar_not_rotated",
-    "605580 恒盛能源 pool_subtype=radar_not_rotated"
+    "000691 亚太实业 pool_subtype=radar_not_rotated",
+    "002976 瑞玛精密 pool_subtype=radar_not_rotated",
+    "000566 海南海药 pool_subtype=radar_not_rotated",
+    "605366 宏柏新材 pool_subtype=radar_not_rotated",
+    "600360 华微电子 pool_subtype=radar_not_rotated",
+    "603725 天安新材 pool_subtype=radar_not_rotated"
   ],
   "alert_statuses": {
-    "002367": "strong_up",
-    "002386": "observe",
-    "603661": "underwater",
-    "603065": "observe",
-    "600791": "entry_zone",
-    "000012": "entry_zone",
-    "600183": "near_invalid",
-    "600769": "near_invalid"
+    "600488": "sharp_down",
+    "002522": "observe",
+    "002374": "entry_zone",
+    "002728": "underwater",
+    "603669": "underwater",
+    "600881": "entry_zone",
+    "600183": "observe",
+    "600769": "cost_loss"
   },
-  "pending_alerts": [
-    {
-      "event": "hold_near_invalid",
-      "tier": "A",
-      "stage": "HOLD",
-      "code": "600769",
-      "name": "祥龙电业",
-      "industry": "未知行业",
-      "price": 20.49,
-      "pct": -6.736458807464729,
-      "zone_low": 21.66,
-      "zone_high": 22.056,
-      "invalid": 20.231,
-      "trigger": 21.99,
-      "stop_distance": 0.012802135336859033,
-      "amount": 1057536618.0,
-      "hhmm": "14:57",
-      "queued_at": "2026-06-24T14:57:31"
-    }
-  ],
-  "last_alert_flush_at": "2026-06-24T14:50:19"
+  "pending_alerts": [],
+  "last_alert_flush_at": "2026-06-25T14:45:21"
 }
