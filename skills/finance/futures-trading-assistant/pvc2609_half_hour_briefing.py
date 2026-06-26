@@ -129,6 +129,51 @@ def append_log(record: dict) -> None:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def optional_float(value: object) -> float | None:
+    try:
+        if value is None or value == "":
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def normalize_prediction_level(item: dict) -> list[dict]:
+    role = str(item.get("role") or "watch")
+    label = str(item.get("label") or item.get("role") or "预测关键位")
+    direction = str(item.get("direction") or "both")
+    range_low = optional_float(item.get("range_low") or item.get("low"))
+    range_high = optional_float(item.get("range_high") or item.get("high"))
+    price = optional_float(item.get("price"))
+    if price is None and isinstance(item.get("price"), str):
+        numbers = [float(value) for value in re.findall(r"\d+(?:\.\d+)?", str(item.get("price")))]
+        if len(numbers) >= 2:
+            range_low, range_high = min(numbers[0], numbers[1]), max(numbers[0], numbers[1])
+        elif numbers:
+            price = numbers[0]
+    prices = [price] if price is not None else []
+    if not prices and range_low is not None and range_high is not None:
+        prices = [range_low, range_high]
+
+    normalized = []
+    for index, level_price in enumerate(prices):
+        if level_price <= 0:
+            continue
+        boundary = ""
+        if len(prices) == 2:
+            boundary = "下沿" if index == 0 else "上沿"
+        normalized.append({
+            "price": level_price,
+            "role": f"{role}_{'low' if index == 0 else 'high'}" if boundary and role not in ("watch", "support", "resistance") else role,
+            "label": f"{label}{boundary}" if boundary and boundary not in label else label,
+            "direction": direction,
+            "group_id": str(item.get("group_id") or "") or None,
+            "range_low": range_low,
+            "range_high": range_high,
+        })
+    return normalized
+
+
 def load_prediction_levels() -> dict:
     if not PREDICTION_LEVELS_PATH.exists():
         return {"levels": [], "source_doc": None}
@@ -138,18 +183,9 @@ def load_prediction_levels() -> dict:
         return {"levels": [], "source_doc": None}
     clean_levels = []
     for item in data.get("levels", []):
-        try:
-            price = float(item.get("price"))
-        except (TypeError, ValueError):
+        if not isinstance(item, dict):
             continue
-        if price <= 0:
-            continue
-        clean_levels.append({
-            "price": price,
-            "role": str(item.get("role") or "watch"),
-            "label": str(item.get("label") or item.get("role") or "预测关键位"),
-            "direction": str(item.get("direction") or "both"),
-        })
+        clean_levels.extend(normalize_prediction_level(item))
     return {
         "levels": clean_levels,
         "source_doc": data.get("source_doc"),

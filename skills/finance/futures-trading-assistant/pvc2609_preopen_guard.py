@@ -19,9 +19,11 @@ from zoneinfo import ZoneInfo
 
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = BASE_DIR / "configs" / "pvc2609_feishu_monitor.yaml"
+REPORTS_DIR = BASE_DIR / "reports"
 RUNTIME_DIR = BASE_DIR / "runtime" / "pvc2609_feishu_monitor"
 EVENT_STATE_PATH = RUNTIME_DIR / "last_alert_state.json"
 BRIEFING_STATE_PATH = RUNTIME_DIR / "briefing_state.json"
+PREDICTION_LEVELS_PATH = RUNTIME_DIR / "latest_prediction_levels.json"
 QUOTE_URL = "https://hq.sinajs.cn/list=nf_V2609"
 TZ = ZoneInfo("Asia/Shanghai")
 CONTRACT = "PVC2609"
@@ -181,6 +183,37 @@ def check_state_files() -> tuple[bool, str]:
     return True, "状态OK：cooldown/dedupe文件可读或尚未生成"
 
 
+def expected_plan_report(session: str, now: datetime) -> Path | None:
+    if session == "night":
+        return REPORTS_DIR / f"pvc2609_{now.strftime('%Y%m%d')}_day_review_night_plan.md"
+    candidates = sorted(REPORTS_DIR.glob("pvc2609_*_night_review_next_day_plan.md"), reverse=True)
+    return candidates[0] if candidates else None
+
+
+def check_prediction_freshness(session: str, now: datetime) -> tuple[bool, str]:
+    expected = expected_plan_report(session, now)
+    if expected is None:
+        return False, "未找到任何夜盘复盘+次日日盘计划报告"
+    expected_rel = expected.relative_to(BASE_DIR).as_posix()
+    if not expected.exists():
+        return False, f"最新计划报告缺失：{expected_rel}"
+    if not PREDICTION_LEVELS_PATH.exists():
+        return False, "监控预测点位文件缺失：latest_prediction_levels.json"
+    try:
+        payload = json.loads(PREDICTION_LEVELS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return False, f"监控预测点位文件不可读：{exc}"
+
+    source_doc = str(payload.get("source_doc") or "")
+    levels = payload.get("levels") or []
+    if source_doc != expected_rel:
+        return False, f"监控计划未同步：当前 {source_doc or '空'}；应为 {expected_rel}"
+    if not isinstance(levels, list) or not levels:
+        return False, f"监控计划已指向 {expected_rel}，但 levels 为空"
+    updated_at = payload.get("updated_at") or "未知时间"
+    return True, f"计划OK：监控点位来自 {expected_rel}，levels {len(levels)} 个，更新 {updated_at}"
+
+
 def format_message(now: datetime, session: str, checks: list[tuple[str, bool, str]]) -> str:
     all_ok = all(ok for _, ok, _ in checks)
     status = "通过" if all_ok else "未通过"
@@ -221,6 +254,7 @@ def main() -> int:
         ("Cron", check_cron_jobs),
         ("行情", lambda: check_data(now)),
         ("状态文件", check_state_files),
+        ("计划新鲜度", lambda: check_prediction_freshness(args.session, now)),
     ]:
         try:
             ok, detail = fn()

@@ -31,6 +31,7 @@ SEVERITY_B_COOLDOWN_SECONDS = 600
 SAME_LEVEL_CHOP_LIMIT = 3
 SAME_LEVEL_SUPPRESS_SECONDS = 1800
 REENTRY_RESET_POINTS = 6
+NEAR_KEY_LEVEL_DISTANCE = 5
 
 DAY_SESSIONS = [
     (time(9, 0), time(10, 15)),
@@ -159,6 +160,51 @@ def append_event(event: dict) -> None:
         f.write(json.dumps(event, ensure_ascii=False) + "\n")
 
 
+def optional_float(value: object) -> float | None:
+    try:
+        if value is None or value == "":
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def normalize_prediction_level(item: dict) -> list[dict]:
+    role = str(item.get("role") or "watch")
+    label = str(item.get("label") or item.get("role") or "预测关键位")
+    direction = str(item.get("direction") or "both")
+    range_low = optional_float(item.get("range_low") or item.get("low"))
+    range_high = optional_float(item.get("range_high") or item.get("high"))
+    price = optional_float(item.get("price"))
+    if price is None and isinstance(item.get("price"), str):
+        numbers = [float(value) for value in re.findall(r"\d+(?:\.\d+)?", str(item.get("price")))]
+        if len(numbers) >= 2:
+            range_low, range_high = min(numbers[0], numbers[1]), max(numbers[0], numbers[1])
+        elif numbers:
+            price = numbers[0]
+    prices = [price] if price is not None else []
+    if not prices and range_low is not None and range_high is not None:
+        prices = [range_low, range_high]
+
+    normalized = []
+    for index, level_price in enumerate(prices):
+        if level_price <= 0:
+            continue
+        boundary = ""
+        if len(prices) == 2:
+            boundary = "下沿" if index == 0 else "上沿"
+        normalized.append({
+            "price": level_price,
+            "role": f"{role}_{'low' if index == 0 else 'high'}" if boundary and role not in ("watch", "support", "resistance") else role,
+            "label": f"{label}{boundary}" if boundary and boundary not in label else label,
+            "direction": direction,
+            "group_id": str(item.get("group_id") or "") or None,
+            "range_low": range_low,
+            "range_high": range_high,
+        })
+    return normalized
+
+
 def load_prediction_levels() -> dict:
     if not PREDICTION_LEVELS_PATH.exists():
         return {"levels": [], "source_doc": None}
@@ -168,18 +214,9 @@ def load_prediction_levels() -> dict:
         return {"levels": [], "source_doc": None}
     clean_levels = []
     for item in data.get("levels", []):
-        try:
-            price = float(item.get("price"))
-        except (TypeError, ValueError):
+        if not isinstance(item, dict):
             continue
-        if price <= 0:
-            continue
-        clean_levels.append({
-            "price": price,
-            "role": str(item.get("role") or "watch"),
-            "label": str(item.get("label") or item.get("role") or "预测关键位"),
-            "direction": str(item.get("direction") or "both"),
-        })
+        clean_levels.extend(normalize_prediction_level(item))
     return {
         "levels": clean_levels,
         "source_doc": data.get("source_doc"),
@@ -273,6 +310,29 @@ def maybe_reset_level_state(state: dict, quote: dict) -> None:
             level_state.pop("suppressed_until", None)
 
 
+def maybe_near_key_level_event(last: float, previous_price: object, levels: dict) -> tuple[str, str, str, str, str] | None:
+    candidates = []
+    for item in levels.get("prediction_levels", []):
+        key_level = item["price"]
+        distance = abs(last - key_level)
+        if distance > NEAR_KEY_LEVEL_DISTANCE:
+            continue
+        if previous_price is not None:
+            try:
+                previous_distance = abs(float(previous_price) - key_level)
+            except (TypeError, ValueError):
+                previous_distance = NEAR_KEY_LEVEL_DISTANCE + 1
+            if previous_distance <= NEAR_KEY_LEVEL_DISTANCE:
+                continue
+        candidates.append((distance, key_level, item))
+    if not candidates:
+        return None
+    _, key_level, item = sorted(candidates, key=lambda value: value[0])[0]
+    label = item.get("label") or "预测关键位"
+    reason = f"接近预测关键位 {key_level:.0f}（{label}），等待3m收线确认"
+    return ("near_key_level", "B", reason, "near_key_level_wait_for_3m_confirmation", f"接近预测位 {key_level:.0f}")
+
+
 def classify_event(quote: dict, rows_3m: list[dict], rows_15m: list[dict], levels: dict, state: dict, now: datetime) -> dict | None:
     last = quote["last"]
     previous_price = state.get("last_price")
@@ -304,6 +364,9 @@ def classify_event(quote: dict, rows_3m: list[dict], rows_15m: list[dict], level
             if move >= 25:
                 direction = "快速上行" if last > previous_price_float else "快速下行"
                 events.append(("sharp_move", "A", f"1分钟级别价格{direction}约 {move:.0f} 点", "sharp_move_watch", direction))
+    near_event = maybe_near_key_level_event(last, previous_price, levels)
+    if near_event:
+        events.append(near_event)
     if not events:
         return None
 
@@ -340,6 +403,16 @@ def format_message(quote: dict, levels: dict, event: dict, now: datetime, stale_
     oi_note = ""
     if event.get("oi_delta") is not None:
         oi_note = f"；3m持仓变化 {event['oi_delta']:.0f}"
+    if event.get("event_key") == "near_key_level":
+        return (
+            "@所有人\n"
+            f"PVC2609｜{now.strftime('%H:%M')}｜接近关键位提醒｜现价 {quote['last']:.0f}｜{data_freshness}\n"
+            f"触发：{event['trigger_reason']}\n"
+            "状态：只提示接近关键位，等待3m收线确认；未确认则继续观望。\n"
+            f"点位：支撑 {levels['support']:.0f}；压力 {levels['resistance']:.0f}\n"
+            f"量仓：公开K线仅可估算量仓变化{oi_note}\n"
+            "备注：本提醒不是开仓建议；公开数据仅一档盘口，无逐笔主动买卖。"
+        )
     stop_loss = levels["invalidation_long"] if "long" in event["scenario_state"] or "breakout" in event["scenario_state"] else levels["invalidation_short"]
     targets = f"先看 {levels['resistance']:.0f}/{levels['session_high']:.0f}" if quote["last"] <= levels["resistance"] else f"回看 {levels['support']:.0f}/{levels['session_low']:.0f}"
     return (

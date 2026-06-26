@@ -196,15 +196,15 @@
       "schedule_display": "* 9-15,21-23 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 2913
+        "completed": 2937
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T01:08:02.161874+08:00",
-      "next_run_at": "2026-06-26T23:23:00+08:00",
-      "last_run_at": "2026-06-26T23:22:07.677558+08:00",
+      "next_run_at": "2026-06-26T23:47:00+08:00",
+      "last_run_at": "2026-06-26T23:46:11.575118+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -240,15 +240,15 @@
       "schedule_display": "*/5 9-15,21-23 * * 1-5",
       "repeat": {
         "times": null,
-        "completed": 593
+        "completed": 598
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T01:08:03.241864+08:00",
-      "next_run_at": "2026-06-26T23:25:00+08:00",
-      "last_run_at": "2026-06-26T23:20:07.339723+08:00",
+      "next_run_at": "2026-06-26T23:50:00+08:00",
+      "last_run_at": "2026-06-26T23:45:11.386125+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -397,5 +397,5 @@
       "workdir": "/Users/fenomenoronaldo/.hermes/skills/finance/stock-strategy-assistant"
     }
   ],
-  "updated_at": "2026-06-26T23:22:07.678258+08:00"
+  "updated_at": "2026-06-26T23:46:11.575674+08:00"
 }

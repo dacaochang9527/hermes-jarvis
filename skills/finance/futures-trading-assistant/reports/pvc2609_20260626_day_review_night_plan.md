@@ -310,8 +310,8 @@ invalidated_levels:
     reason: 已跌破，不适合作为近期参考
   - price: 4425
     reason: 已跌破，不适合作为近期参考
-monitor_levels_updated: false (需要夜盘前更新)
-day_summary: 增仓下杀日。O:4460 H:4488 L:4385 C:4388, OI +85k。前序计划 C/D 触发但幅度远超预期。日盘尾段空头主动持仓过夜。所有周期同步下行无底部信号。监控仍使用 0624 旧预测 levels，需更新。
+monitor_levels_updated: true (已于 2026-06-26 23:35 手动同步至 latest_prediction_levels.json)
+day_summary: 增仓下杀日。O:4460 H:4488 L:4385 C:4388, OI +85k。前序计划 C/D 触发但幅度远超预期。日盘尾段空头主动持仓过夜。所有周期同步下行无底部信号。监控已从 0624 旧预测 levels 切换到本报告夜盘关键位。
 ```
 
-> 注：`monitor_levels_updated: false` 表示本次 0626 日盘的预测 levels 尚未推送到监控系统。夜盘开市前须执行 `--update-levels` 或手动更新 `latest_prediction_levels.json`。
+> 注：`monitor_levels_updated: true` 表示本次 0626 日盘的预测 levels 已手动推送到监控系统；后续自动生成报告时仍应优先使用 `--update-levels` 固化该步骤。
