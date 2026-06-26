@@ -139,35 +139,22 @@ def publish(markdown_path: Path, title: str | None, title_suffix: str | None, no
     if not first_level_ids or not blocks:
         raise PublishError("Converter returned empty first_level_block_ids or blocks")
 
-    # Chunk descendants to avoid "max len is 1000" Feishu API limit
-    CHUNK_SIZE = 800
-    if len(blocks) <= CHUNK_SIZE:
-        api_request(
-            "POST",
-            f"/open-apis/docx/v1/documents/{document_id}/blocks/{document_id}/descendant?document_revision_id=-1",
-            token,
-            json={"children_id": first_level_ids, "descendants": blocks},
-            timeout=60,
+    # Chunking does NOT work (Feishu API: 1770041 "open schema mismatch").
+    # If blocks exceed 950 pre-trim the markdown instead.
+    MAX_BLOCKS = 950
+    if len(blocks) > MAX_BLOCKS:
+        raise PublishError(
+            f"Document has {len(blocks)} blocks (max: {MAX_BLOCKS}). "
+            f"Trim the markdown (remove STATE_HANDOFF, 小资金 table, detailed per-scheme plans) "
+            f"before publishing."
         )
-    else:
-        # First batch: include children_id to set document structure
-        api_request(
-            "POST",
-            f"/open-apis/docx/v1/documents/{document_id}/blocks/{document_id}/descendant?document_revision_id=-1",
-            token,
-            json={"children_id": first_level_ids, "descendants": blocks[:CHUNK_SIZE]},
-            timeout=60,
-        )
-        # Remaining batches: use empty children_id (top-level already established)
-        for i in range(CHUNK_SIZE, len(blocks), CHUNK_SIZE):
-            chunk = blocks[i:i + CHUNK_SIZE]
-            api_request(
-                "POST",
-                f"/open-apis/docx/v1/documents/{document_id}/blocks/{document_id}/descendant?document_revision_id=-1",
-                token,
-                json={"children_id": [], "descendants": chunk},
-                timeout=60,
-            )
+    api_request(
+        "POST",
+        f"/open-apis/docx/v1/documents/{document_id}/blocks/{document_id}/descendant?document_revision_id=-1",
+        token,
+        json={"children_id": first_level_ids, "descendants": blocks},
+        timeout=60,
+    )
 
     permission = api_request(
         "PATCH",

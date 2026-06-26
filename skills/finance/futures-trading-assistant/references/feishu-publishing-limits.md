@@ -14,7 +14,9 @@ The descendant endpoint is designed for one-shot document population. Calling it
 - With `children_id: []` → same error
 - With the original `children_id` → replaces first batch's children
 
-**Do not build multi-call chunking into the publisher script.** It will fail.
+**Do not build multi-call chunking into the publisher script. It will fail.**
+
+The `publish_feishu_markdown_doc.py` script was patched on 2026-06-26 to remove chunking. It now uses single-shot with a 950-block guard. If your document exceeds 950 blocks, trim the markdown (remove STATE_HANDOFF, 小资金 table, and/or detailed per-scheme sections) and retry.
 
 ### Working Solution: Pre-Trim Markdown
 

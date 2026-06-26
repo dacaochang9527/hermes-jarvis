@@ -1,6 +1,6 @@
 {
-  "last_price": 4466.5,
-  "last_quote_time": "2026-06-25T22:59:16+08:00",
+  "last_price": 4388.5,
+  "last_quote_time": "2026-06-26T22:59:02+08:00",
   "last_sent": {
     "key_level_break:跌破 4550": "2026-06-22T09:48:34.402748+08:00",
     "prediction_level_break:跌破预测位 4480": "2026-06-25T21:15:01.774145+08:00",
@@ -18,7 +18,9 @@
     "prediction_level_reclaim:收回预测位 4510": "2026-06-25T10:57:53.131069+08:00",
     "prediction_level_reclaim:收回预测位 4535": "2026-06-25T11:00:57.231364+08:00",
     "resistance_break:上破 4470": "2026-06-25T14:59:43.831583+08:00",
-    "prediction_level_break:跌破预测位 4460": "2026-06-25T21:00:41.797075+08:00"
+    "prediction_level_break:跌破预测位 4460": "2026-06-26T09:04:44.005379+08:00",
+    "support_break:跌破 4406": "2026-06-26T13:56:28.348891+08:00",
+    "support_break:跌破 4381": "2026-06-26T22:28:26.238523+08:00"
   },
   "level_state": {
     "prediction_level_reclaim:收回预测位 4505": {
@@ -52,7 +54,7 @@
       "last_sent_bar_id": "2026-06-25 21:06:00"
     },
     "prediction_level_break:跌破预测位 4470": {
-      "cross_count": 1,
+      "cross_count": 0,
       "last_cross_at": "2026-06-25T22:37:47.637929+08:00",
       "last_sent_bar_id": "2026-06-25 22:39:00"
     },
@@ -78,8 +80,18 @@
     },
     "prediction_level_break:跌破预测位 4460": {
       "cross_count": 0,
-      "last_cross_at": "2026-06-25T21:00:41.797075+08:00",
-      "last_sent_bar_id": "2026-06-25 21:03:00"
+      "last_cross_at": "2026-06-26T09:04:44.005379+08:00",
+      "last_sent_bar_id": "2026-06-26 09:06:00"
+    },
+    "support_break:跌破 4406": {
+      "cross_count": 0,
+      "last_cross_at": "2026-06-26T13:56:28.348891+08:00",
+      "last_sent_bar_id": "2026-06-26 13:57:00"
+    },
+    "support_break:跌破 4381": {
+      "cross_count": 0,
+      "last_cross_at": "2026-06-26T22:28:26.238523+08:00",
+      "last_sent_bar_id": "2026-06-26 22:30:00"
     }
   }
 }

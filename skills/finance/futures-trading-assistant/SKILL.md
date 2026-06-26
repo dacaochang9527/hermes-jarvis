@@ -95,7 +95,69 @@ Known limitations:
    - no trigger → observe.
 6. For every scenario, include entry zone, stop loss, take profit, estimated probability, basis, invalidation condition, and position-size caveat.
 7. For PVC2609 day/night reports, first bootstrap with `python pvc2609_generate_session_report.py --date YYYYMMDD --session day|night`; review and revise the generated full draft before treating the document as final. Add `--overwrite` only when replacing the canonical report, and add `--update-levels` only after the plan has been reviewed.
-8. If saving to Markdown, write under `~/.hermes/skills/finance/futures-trading-assistant/reports/` unless the user specifies another path.
+8. If the generate script **times out**, the cause is almost certainly the Sina API rejecting requests without a Referer header. The script uses bare `urllib.request` which does not set one. Fall back to manual data collection with curl (see "Manual Data Collection Fallback" below).
+9. If saving to Markdown, write under `~/.hermes/skills/finance/futures-trading-assistant/reports/` unless the user specifies another path.
+
+### Manual Data Collection Fallback (when the generate script fails)
+
+When the `pvc2609_generate_session_report.py` times out due to Sina API Referer requirements, collect data manually:
+
+**Quote snapshot:**
+```bash
+curl -s --max-time 10 -H "Referer: https://finance.sina.com.cn" "https://hq.sinajs.cn/list=nf_V2609"
+```
+
+**Daily K-line (last 5 entries):**
+```bash
+curl -s --max-time 15 -H "Referer: https://finance.sina.com.cn" \
+  "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_V2609_D=/InnerFuturesNewService.getDailyKLine?symbol=V2609"
+```
+
+**3m/15m K-lines (replace type=15 with 3/15/30/60/120):**
+```bash
+curl -s --max-time 15 -H "Referer: https://finance.sina.com.cn" \
+  "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_V2609_3=/InnerFuturesNewService.getFewMinLine?symbol=V2609&type=3"
+```
+
+**JSONP cleanup and parsing:** The Sina API wraps JSON in JSONP with optional redirect script. Use Python:
+```python
+import re, json
+raw = curl_output  # as saved from curl
+# Strip redirect script if present:
+clean = re.sub(r'^/\*<script>.*?</script>\*/', '', raw)
+# Extract JSON array:
+m = re.search(r'=\s*\((\[.*\])\s*\);', clean, re.DOTALL)
+js = m.group(1)
+# Remove control characters (Sina sometimes embeds literal \n in strings):
+js_clean = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', js)
+data = json.loads(js_clean)
+today = [b for b in data if b.get('d','').startswith('YYYY-MM-DD')]
+```
+
+**Parsing quote data (Sina futures format for PVC2609):**
+```
+- Field order: name,time_code(150418=15:04:18),open,prev_settlement,current,high,low,...,date
+- Daily K-line fields: d(date), o(open), h(high), l(low), c(close), v(volume), p(open_interest)
+```
+
+**Monitor logs:**
+```bash
+# Half-hour briefings for today:
+grep "YYYY-MM-DD" runtime/pvc2609_feishu_monitor/half_hour_briefings.jsonl
+
+# Events for today (file can be large, tail + filter):
+tail -200 runtime/pvc2609_feishu_monitor/events.jsonl | grep "YYYY-MM-DDTHH:"
+```
+
+A reusable script `scripts/fetch_sina_pvc2609.py` is available that handles the Referer header, JSONP parsing with control-character cleanup, and both quote + K-line fetching. Use it instead of hand-writing curl commands each time:
+```bash
+python scripts/fetch_sina_pvc2609.py --quote
+python scripts/fetch_sina_pvc2609.py --kline daily --last 5
+python scripts/fetch_sina_pvc2609.py --kline 3 --filter-today
+python scripts/fetch_sina_pvc2609.py --kline 15 --filter-today
+```
+
+After collecting data, write the report directly following the 20-section structure. Save to `reports/` and proceed to Feishu publishing.
 
 ### PVC2609 复盘落盘纪律（用户纠正后固化）
 
@@ -231,8 +293,9 @@ Avoid language like:
 3. Chasing low-position shorts during RSI extreme oversold. Add confirmation such as failed rebound or broken support retest.
 4. Designing a 5% profit target without explaining required points and contract count.
 5. Providing only one direction. Futures planning should include both long and short trigger conditions unless user explicitly asks for one side.
-6. Sending >1000 blocks to the Feishu descendant API. The endpoint rejects large payloads; pre-trim the markdown (remove STATE_HANDOFF + optional sections like 小资金点数) before conversion to stay under the limit. Multi-call chunking does not work. See `references/feishu-publishing-limits.md`.
+6. Sending >1000 blocks to the Feishu descendant API. The endpoint rejects large payloads; pre-trim the markdown (remove STATE_HANDOFF + optional sections like 小资金点数) before conversion to stay under the limit. The `publish_feishu_markdown_doc.py` script now uses single-shot with a 950-block guard — multi-call chunking does NOT work (error 1770041 "open schema mismatch") and was removed. If publishing fails, trim more aggressively and retry. See `references/feishu-publishing-limits.md`.
 7. Publishing a review report where the monitor loaded stale prediction levels from a prior plan. The monitor reads `latest_prediction_levels.json` at startup; if a new plan was generated but not deployed before the monitor started, alerts fire against old levels. Run `--update-levels` on the reviewed plan before the next session's monitor starts. If the gap cannot be closed, note the discrepancy in the review's Section 7.
+8. **Sina API blocks bare urllib requests.** The generate script (`pvc2609_generate_session_report.py`) uses `urllib.request` without a `Referer` header and will hang/time out. Sina requires `Referer: https://finance.sina.com.cn`. When the script fails, fall back to manual data collection with curl (see "Manual Data Collection Fallback" above). Consider fixing the script by adding the Referer header.
 
 ## Verification Checklist
 
@@ -242,3 +305,5 @@ Avoid language like:
 - [ ] Tick/active-buy limitations disclosed when unavailable.
 - [ ] Each scenario has entry, stop loss, take profit, probability, basis, and invalidation.
 - [ ] Markdown reports are saved under `~/.hermes/skills/finance/futures-trading-assistant/reports/` unless user specifies otherwise.
+- [ ] Generate script timed out? Fall back to manual data collection with `curl -H "Referer: https://finance.sina.com.cn"`.
+- [ ] Feishu publish failed? Check if `total_blocks > 950` (trim STATE_HANDOFF, 小资金, detailed schemes) or check for error 1770041 (chunking was removed — single-shot only).
