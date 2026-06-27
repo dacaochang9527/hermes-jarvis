@@ -11,7 +11,7 @@ metadata:
   hermes:
     tags: [computer-use, macos, desktop, automation, gui]
     category: desktop
-    related_skills: [browser]
+    related_skills: [browser, cursor-applescript]
 ---
 
 # macOS Computer Use (universal, any-model)
@@ -188,6 +188,126 @@ your conversation context.
 - **"blocked pattern in type text"** — You tried to `type` a shell command
   that matches the dangerous-pattern block list (`curl ... | bash`,
   `sudo rm -rf`, etc.). Break the command up or reconsider.
+
+## AppleScript fallback (when `computer_use` is not available)
+
+If `computer_use` is not in your tool list (session started before it was
+enabled, or it was disabled), you can drive macOS apps through **AppleScript**
+via `terminal()` with `osascript`. This is especially useful for Electron
+apps (Cursor, VS Code, Chrome) where AX introspection is limited.
+
+### App activation
+
+```bash
+osascript -e 'tell application "System Events" to tell process "Cursor" to set frontmost to true'
+```
+
+`delay 0.3–0.5` after activation before the next command so the app processes
+the focus change.
+
+### Keystroke simulation
+
+```bash
+# Send a keyboard shortcut
+osascript -e 'tell application "System Events" to keystroke "l" using command down'
+
+# Send modifier combos with key codes (key code 34 = "i")
+osascript -e 'tell application "System Events" to key code 34 using {command down, shift down}'
+
+# Send plain Enter / Escape / Tab
+osascript -e 'tell application "System Events" to key code 53'   # Escape
+osascript -e 'tell application "System Events" to keystroke return'  # Enter
+```
+
+### Chinese / long Unicode text input (critical pattern)
+
+AppleScript's `keystroke` with long Chinese text frequently **times out**
+or drops characters. The reliable pattern is **pbcopy + Cmd+V**:
+
+```bash
+# Put the text on the clipboard
+echo '需要输入的中文或长文本' | pbcopy
+
+# Paste it into the focused UI element
+osascript -e 'delay 0.3' -e 'tell application "System Events" to keystroke "v" using command down'
+```
+
+This is the **only reliable way** to input Chinese / long Unicode text into
+Electron apps via AppleScript.
+
+### Cursor (IDE) automation patterns
+
+When the user says "Cursor," they mean the **IDE** (the Electron app), NOT
+the Codex CLI — even if Codex runs as an extension inside Cursor. Do not
+route "drive Cursor" requests to `codex exec`; use AppleScript + keyboard
+simulation instead.
+
+| Action | Shortcut | Notes |
+|--------|----------|-------|
+| Open Chat panel | `Cmd+L` | Focus lands on input field |
+| Open Composer (separate) | `Cmd+Shift+I` | Keyboard shortcut may vary |
+| Open Composer (inline) | `Cmd+I` | Opens in-editor |
+| Submit in Chat | `Cmd+Shift+Enter` | Adds to conversation |
+| Submit in Composer | `Cmd+Enter` | Sends to agent |
+| Close panel / dismiss | `Escape` | Press twice to clear dialogs |
+| Dismiss dialogs first | `Escape` × 2 | Before opening any panel |
+
+**Full workflow** (switch model, then open Composer, paste prompt, submit):
+
+Load **`cursor-applescript`** first when the session specifies a target model.
+
+```bash
+# 0. Switch model (model name from user/session; add --window when needed)
+bash "$HOME/.hermes/skills/apple/cursor-applescript/scripts/switch_cursor_model.sh" "gpt-5.5"
+bash "$HOME/.hermes/skills/apple/cursor-applescript/scripts/switch_cursor_model.sh" --window ".hermes" "gpt-5.5"
+
+# Or one-shot: switch + submit
+# bash ".../submit_cursor_composer.sh" --window ".hermes" "gpt-5.5" "your prompt here"
+
+# 1. Place prompt on clipboard
+printf '请在 .hermes 工作区用 gpt-5.5 出一个升级 plan' | pbcopy
+
+# 2. Focus Cursor, dismiss dialogs, open panel, paste, submit
+osascript -e '
+tell application "System Events" to tell process "Cursor" to set frontmost to true
+delay 0.3
+tell application "System Events" to key code 53
+delay 0.3
+tell application "System Events" to key code 53
+delay 0.3
+tell application "System Events" to keystroke "i" using {command down, shift down}
+delay 2
+tell application "System Events" to keystroke "v" using command down
+delay 0.5
+tell application "System Events" to keystroke return using command down
+return "done"
+'
+```
+
+### Pitfalls
+
+- **`osascript` with `&` in code** — AppleScript uses `&` for string
+  concatenation. The shell interprets `&` as backgrounding when it appears
+  in multi-line `-e` scripts written inline. **Write complex scripts to a
+  `.scpt` file** with `write_file`, then run `osascript /tmp/script.scpt`.
+  Or keep each `-e` fragment free of concatenation operators.
+- **Electron AX opacity** — Cursor, VS Code, and most Electron apps expose
+  very few accessible UI elements via `entire contents` (often just the
+  top-level window group). Do not waste time probing AX hierarchy; go
+  straight to keystroke simulation.
+- **`keystroke` with Chinese/long text times out** (timeout=10s default).
+  Always use `pbcopy` + Cmd+V for text longer than ~20 characters.
+- **Model selection** — Use the **`cursor-applescript`** skill:
+  `switch_cursor_model.sh "$MODEL"`. With `--window` / `--workspace`, the script
+  clicks the matching item in Cursor's **Window menu** (workspace folder name,
+  not Tab title). Run `list_cursor_windows.sh` to list workspaces. Script runs
+  **`Escape` + `Cmd+1` then `Cmd+L` then `Cmd+/`** so focus leaves the
+  integrated terminal and code editor before paste. When the user names a
+  window, **always** pass `--window "$QUERY"` — never omit it.
+- **Cursor vs Codex CLI**: Asking Cursor (IDE) to use model X does NOT
+  automatically configure the Codex CLI. They have separate model configs.
+  Cursor's AI runs inside the Electron app; Codex CLI is a standalone
+  terminal tool.
 
 ## When NOT to use `computer_use`
 
