@@ -34,8 +34,23 @@ TZ = ZoneInfo("Asia/Shanghai")
 MINUTE_PERIODS = (3, 15, 30, 60, 120)
 
 SESSION_WINDOWS = {
+    "morning": [(time(9, 0), time(10, 15)), (time(10, 30), time(11, 30))],
     "day": [(time(9, 0), time(10, 15)), (time(10, 30), time(11, 30)), (time(13, 30), time(15, 0))],
     "night": [(time(21, 0), time(23, 0))],
+}
+
+SESSION_TITLES = {
+    "morning": "上午盘",
+    "afternoon": "午盘",
+    "day": "日盘",
+    "night": "夜盘",
+    "next_day_day": "日盘",
+}
+
+DEFAULT_NEXT_SESSION = {
+    "morning": "afternoon",
+    "day": "night",
+    "night": "next_day_day",
 }
 
 
@@ -240,6 +255,17 @@ def fmt_dt(value: datetime | None) -> str:
     return value.strftime("%Y-%m-%d %H:%M:%S")
 
 
+def session_title(session: str) -> str:
+    return SESSION_TITLES.get(session, session)
+
+
+def relative_report_path(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(BASE_DIR))
+    except ValueError:
+        return str(path)
+
+
 def read_jsonl(path: Path, trading_date: date, session: str, limit: int = 8) -> list[dict]:
     if not path.exists():
         return []
@@ -267,6 +293,12 @@ def read_jsonl(path: Path, trading_date: date, session: str, limit: int = 8) -> 
 def find_prior_report(trading_date: date, session: str) -> Path | None:
     if session == "night":
         candidates = [REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_day_review_night_plan.md"]
+    elif session == "morning":
+        candidates = [REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_morning_preopen_review_forecast.md"]
+        candidates.extend(
+            REPORTS_DIR / f"pvc2609_{trading_date - timedelta(days=offset):%Y%m%d}_night_review_next_day_plan.md"
+            for offset in range(1, 8)
+        )
     else:
         previous = trading_date - timedelta(days=1)
         candidates = [
@@ -385,6 +417,13 @@ def session_segments(rows: list[Bar], session: str) -> list[tuple[str, list[Bar]
             ("破位后验证段", time(21, 30), time(22, 0)),
             ("中段修复/延续段", time(22, 0), time(22, 40)),
             ("尾段收盘定性段", time(22, 40), time(23, 0)),
+        ]
+    elif session == "morning":
+        windows = [
+            ("上午开局", time(9, 0), time(9, 30)),
+            ("上午第一主段", time(9, 30), time(10, 15)),
+            ("上午续盘确认", time(10, 30), time(11, 0)),
+            ("午前收束定性", time(11, 0), time(11, 30)),
         ]
     else:
         windows = [
@@ -531,9 +570,9 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
     levels = derive_levels(session_summary, quote, klines.get(15, []))
     plan = build_plan_levels(levels)
     bias = infer_bias(session_summary, daily)
-    next_session = "night" if args.session == "day" else "next_day_day"
-    report_name = default_report_name(args.date, args.session)
-    source_doc = f"reports/{report_name}"
+    next_session = args.next_session or DEFAULT_NEXT_SESSION[args.session]
+    next_date = args.next_date or (args.date + timedelta(days=1) if args.session == "night" and next_session == "next_day_day" else args.date)
+    source_doc = relative_report_path(args.output) if args.output else f"reports/{default_report_name(args.date, args.session)}"
     generated_at = now_cn()
     quote_stale = "是" if quote["quote_dt"].date() != args.date else "否"
     ma5 = moving_average(daily, 5)
@@ -548,9 +587,8 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
     briefing_records = read_jsonl(BRIEFING_LOG, args.date, args.session, limit=8)
 
     title_date = args.date.strftime("%Y-%m-%d")
-    next_title = "夜盘" if args.session == "day" else "日盘"
-    completed_title = "日盘" if args.session == "day" else "夜盘"
-    next_date = args.date if args.session == "day" else args.date + timedelta(days=1)
+    next_title = session_title(next_session)
+    completed_title = session_title(args.session)
     next_date_text = next_date.strftime("%Y-%m-%d")
     completed_label = f"{title_date} {completed_title}"
     next_label = f"{next_date_text} {next_title}"
@@ -948,6 +986,8 @@ def format_monitor_record(record: dict) -> str:
 
 
 def default_report_name(trading_date: date, session: str) -> str:
+    if session == "morning":
+        return f"pvc2609_{trading_date:%Y%m%d}_morning_review_afternoon_plan.md"
     if session == "day":
         return f"pvc2609_{trading_date:%Y%m%d}_day_review_night_plan.md"
     return f"pvc2609_{trading_date:%Y%m%d}_night_review_next_day_plan.md"
@@ -956,7 +996,9 @@ def default_report_name(trading_date: date, session: str) -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate PVC2609 session report Markdown draft.")
     parser.add_argument("--date", required=True, type=lambda value: datetime.strptime(value, "%Y%m%d").date(), help="natural trading date, e.g. 20260623")
-    parser.add_argument("--session", required=True, choices=("day", "night"), help="completed session to review")
+    parser.add_argument("--session", required=True, choices=("morning", "day", "night"), help="completed session to review")
+    parser.add_argument("--next-session", choices=("morning", "afternoon", "night", "next_day_day"), help="next session to forecast; defaults from completed session")
+    parser.add_argument("--next-date", type=lambda value: datetime.strptime(value, "%Y%m%d").date(), help="natural date for the next session label")
     parser.add_argument("--output", type=Path, help="output markdown path; defaults to reports/<standard_name>")
     parser.add_argument("--overwrite", action="store_true", help="allow overwriting an existing report")
     parser.add_argument("--update-levels", action="store_true", help="write runtime latest_prediction_levels.json")

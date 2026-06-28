@@ -198,7 +198,7 @@
         "times": null,
         "completed": 2950
       },
-      "enabled": true,
+      "enabled": false,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
@@ -242,7 +242,7 @@
         "times": null,
         "completed": 600
       },
-      "enabled": true,
+      "enabled": false,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
@@ -266,22 +266,22 @@
     },
     {
       "id": "bc8104f3e72b",
-      "name": "PVC2609\u671f\u8d27\u5f00\u76d8\u524d\u5b88\u95e8\u6821\u9a8c",
+      "name": "PVC2609\u671f\u8d27\u65e5\u76d8\u5f00\u76d8\u524d\u590d\u76d8\u9884\u6d4b",
       "prompt": "",
       "skills": [],
       "skill": null,
       "model": null,
       "provider": null,
       "base_url": null,
-      "script": "pvc2609_preopen_guard.sh",
+      "script": "pvc2609_morning_preopen_report.sh",
       "no_agent": true,
       "context_from": null,
       "schedule": {
         "kind": "cron",
-        "expr": "50 8 * * 1-5",
-        "display": "50 8 * * 1-5"
+        "expr": "30 8 * * 1-5",
+        "display": "30 8 * * 1-5"
       },
-      "schedule_display": "50 8 * * 1-5",
+      "schedule_display": "30 8 * * 1-5",
       "repeat": {
         "times": null,
         "completed": 6
@@ -291,7 +291,7 @@
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T01:40:33.016859+08:00",
-      "next_run_at": "2026-06-29T08:50:00+08:00",
+      "next_run_at": "2026-06-29T08:30:00+08:00",
       "last_run_at": "2026-06-26T08:50:32.166297+08:00",
       "last_status": "ok",
       "last_error": null,
@@ -299,8 +299,52 @@
       "deliver": "feishu:oc_3b94cfb91274b70374954d7b12f12432",
       "origin": {
         "platform": "feishu",
-        "chat_id": "oc_1cc02882f99e76f67cc237e8090328f1",
-        "chat_name": "oc_1cc02882f99e76f67cc237e8090328f1",
+        "chat_id": "oc_3b94cfb91274b70374954d7b12f12432",
+        "chat_name": "\u5927AI\u65e0\u7586",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant"
+    },
+    {
+      "id": "a65c3e27d9bf",
+      "name": "PVC2609\u671f\u8d27\u5348\u76d8\u5f00\u76d8\u524d\u590d\u76d8\u9884\u6d4b",
+      "prompt": "",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "pvc2609_afternoon_preopen_report.sh",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 13 * * 1-5",
+        "display": "0 13 * * 1-5"
+      },
+      "schedule_display": "0 13 * * 1-5",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-28T22:37:52.379203+08:00",
+      "next_run_at": "2026-06-29T13:00:00+08:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "feishu:oc_3b94cfb91274b70374954d7b12f12432",
+      "origin": {
+        "platform": "feishu",
+        "chat_id": "oc_3b94cfb91274b70374954d7b12f12432",
+        "chat_name": "\u5927AI\u65e0\u7586",
         "thread_id": null
       },
       "enabled_toolsets": [
@@ -310,22 +354,22 @@
     },
     {
       "id": "dc3c6a72367a",
-      "name": "PVC2609\u671f\u8d27\u591c\u76d8\u5f00\u76d8\u524d\u5b88\u95e8\u6821\u9a8c",
+      "name": "PVC2609\u671f\u8d27\u591c\u76d8\u5f00\u76d8\u524d\u590d\u76d8\u9884\u6d4b",
       "prompt": "",
       "skills": [],
       "skill": null,
       "model": null,
       "provider": null,
       "base_url": null,
-      "script": "pvc2609_night_preopen_guard.sh",
+      "script": "pvc2609_night_preopen_report.sh",
       "no_agent": true,
       "context_from": null,
       "schedule": {
         "kind": "cron",
-        "expr": "50 20 * * 1-5",
-        "display": "50 20 * * 1-5"
+        "expr": "30 20 * * 1-5",
+        "display": "30 20 * * 1-5"
       },
-      "schedule_display": "50 20 * * 1-5",
+      "schedule_display": "30 20 * * 1-5",
       "repeat": {
         "times": null,
         "completed": 5
@@ -335,7 +379,7 @@
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T02:03:50.305146+08:00",
-      "next_run_at": "2026-06-29T20:50:00+08:00",
+      "next_run_at": "2026-06-29T20:30:00+08:00",
       "last_run_at": "2026-06-26T20:50:32.304809+08:00",
       "last_status": "ok",
       "last_error": null,
@@ -343,8 +387,8 @@
       "deliver": "feishu:oc_3b94cfb91274b70374954d7b12f12432",
       "origin": {
         "platform": "feishu",
-        "chat_id": "oc_1cc02882f99e76f67cc237e8090328f1",
-        "chat_name": "oc_1cc02882f99e76f67cc237e8090328f1",
+        "chat_id": "oc_3b94cfb91274b70374954d7b12f12432",
+        "chat_name": "\u5927AI\u65e0\u7586",
         "thread_id": null
       },
       "enabled_toolsets": [

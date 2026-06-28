@@ -1,53 +1,44 @@
 {
   "contract": "PVC2609",
-  "source_doc": "reports/pvc2609_20260626_night_review_next_day_plan.md",
-  "updated_at": "2026-06-26T23:48:00+08:00",
-  "session": "next_day_day",
+  "source_doc": "reports/pvc2609_20260629_morning_preopen_review_forecast.md",
+  "updated_at": "2026-06-28T22:58:49.301141+08:00",
+  "session": "morning",
   "levels": [
     {
-      "price": 4400,
-      "role": "near_resistance_low",
-      "label": "4400-4410 核心压力区下沿",
-      "direction": "up",
-      "group_id": "near_resistance_4400_4410",
-      "range_low": 4400,
-      "range_high": 4410
-    },
-    {
-      "price": 4410,
-      "role": "near_resistance_high",
-      "label": "4400-4410 核心压力区上沿",
-      "direction": "both",
-      "group_id": "near_resistance_4400_4410",
-      "range_low": 4400,
-      "range_high": 4410
-    },
-    {
-      "price": 4393,
-      "role": "night_high",
-      "label": "0626 夜盘最高/上沿测试",
-      "direction": "both"
-    },
-    {
       "price": 4370,
-      "role": "night_low",
-      "label": "0626 夜盘最低/再破确认位",
-      "direction": "both"
-    },
-    {
-      "price": 4360,
-      "role": "extension_target",
-      "label": "4370 有效跌破后第一延伸",
+      "role": "support",
+      "label": "本阶段低点/再破确认位",
       "direction": "down"
     },
     {
-      "price": 4416,
-      "role": "repair_watch_low",
-      "label": "4416-4420 修复观察区下沿",
-      "direction": "up",
-      "group_id": "repair_watch_4416_4420",
-      "range_low": 4416,
-      "range_high": 4420
+      "price": 4370,
+      "role": "weakness_confirmation",
+      "label": "近端支撑/修复失败观察",
+      "direction": "both"
+    },
+    {
+      "price": 4380,
+      "role": "midline_low",
+      "label": "短线中轴下沿",
+      "direction": "both"
+    },
+    {
+      "price": 4475,
+      "role": "resistance",
+      "label": "压力区下沿/承压观察",
+      "direction": "both"
+    },
+    {
+      "price": 4495,
+      "role": "repair_confirmation",
+      "label": "修复延续确认位",
+      "direction": "up"
+    },
+    {
+      "price": 4505,
+      "role": "major_resistance",
+      "label": "大级别修复门槛",
+      "direction": "up"
     }
   ]
 }
