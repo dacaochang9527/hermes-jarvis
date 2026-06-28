@@ -2,7 +2,7 @@
   "jobs": [
     {
       "id": "454b84308082",
-      "name": "A\u80a1\u5c60\u9f99D3\u76d8\u4e2d\u76d1\u63a7",
+      "name": "A股屠龙D3盘中监控",
       "prompt": "",
       "skills": [],
       "skill": null,
@@ -46,7 +46,7 @@
     },
     {
       "id": "121a94d68eb9",
-      "name": "A\u80a1\u5c60\u9f99D3\u56db\u80a1\u6536\u76d8\u590d\u76d8",
+      "name": "A股屠龙D3四股收盘复盘",
       "prompt": "",
       "skills": [],
       "skill": null,
@@ -90,7 +90,7 @@
     },
     {
       "id": "b1415c47305e",
-      "name": "A\u80a1\u5c60\u9f99D3\u5f00\u76d8\u524d\u5207\u6c60",
+      "name": "A股屠龙D3开盘前切池",
       "prompt": "",
       "skills": [],
       "skill": null,
@@ -134,7 +134,7 @@
     },
     {
       "id": "3dfeb3d23604",
-      "name": "A\u80a1\u5c60\u9f99D3\u5f00\u76d8\u524d\u5b88\u95e8\u6821\u9a8c",
+      "name": "A股屠龙D3开盘前守门校验",
       "prompt": "",
       "skills": [],
       "skill": null,
@@ -178,85 +178,41 @@
     },
     {
       "id": "3c80789e6287",
-      "name": "PVC2609\u671f\u8d27\u4e8b\u4ef6\u76d1\u63a7",
+      "name": "PVC2609期货盘中关键位操作重估",
       "prompt": "",
       "skills": [],
       "skill": null,
       "model": null,
       "provider": null,
       "base_url": null,
-      "script": "pvc2609_event_monitor.sh",
+      "script": "pvc2609_intraday_key_level_report.sh",
       "no_agent": true,
       "context_from": null,
       "schedule": {
         "kind": "cron",
-        "expr": "* 9-15,21-23 * * 1-5",
-        "display": "* 9-15,21-23 * * 1-5"
+        "expr": "*/3 9-15,21-23 * * 1-5",
+        "display": "*/3 9-15,21-23 * * 1-5"
       },
-      "schedule_display": "* 9-15,21-23 * * 1-5",
+      "schedule_display": "*/3 9-15,21-23 * * 1-5",
       "repeat": {
         "times": null,
         "completed": 2950
       },
-      "enabled": false,
+      "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T01:08:02.161874+08:00",
       "next_run_at": "2026-06-29T09:00:00+08:00",
       "last_run_at": "2026-06-26T23:59:04.649324+08:00",
-      "last_status": "ok",
+      "last_status": null,
       "last_error": null,
       "last_delivery_error": null,
       "deliver": "feishu:oc_3b94cfb91274b70374954d7b12f12432",
       "origin": {
         "platform": "feishu",
         "chat_id": "oc_3b94cfb91274b70374954d7b12f12432",
-        "chat_name": "\u5927AI\u65e0\u7586",
-        "thread_id": null
-      },
-      "enabled_toolsets": [
-        "terminal"
-      ],
-      "workdir": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant"
-    },
-    {
-      "id": "cb79952c9ff2",
-      "name": "PVC2609\u671f\u8d27\u534a\u5c0f\u65f6\u7b80\u62a5",
-      "prompt": "",
-      "skills": [],
-      "skill": null,
-      "model": null,
-      "provider": null,
-      "base_url": null,
-      "script": "pvc2609_half_hour_briefing.sh",
-      "no_agent": true,
-      "context_from": null,
-      "schedule": {
-        "kind": "cron",
-        "expr": "*/5 9-15,21-23 * * 1-5",
-        "display": "*/5 9-15,21-23 * * 1-5"
-      },
-      "schedule_display": "*/5 9-15,21-23 * * 1-5",
-      "repeat": {
-        "times": null,
-        "completed": 600
-      },
-      "enabled": false,
-      "state": "scheduled",
-      "paused_at": null,
-      "paused_reason": null,
-      "created_at": "2026-06-22T01:08:03.241864+08:00",
-      "next_run_at": "2026-06-29T09:00:00+08:00",
-      "last_run_at": "2026-06-26T23:55:03.864445+08:00",
-      "last_status": "ok",
-      "last_error": null,
-      "last_delivery_error": null,
-      "deliver": "feishu:oc_3b94cfb91274b70374954d7b12f12432",
-      "origin": {
-        "platform": "feishu",
-        "chat_id": "oc_3b94cfb91274b70374954d7b12f12432",
-        "chat_name": "\u5927AI\u65e0\u7586",
+        "chat_name": "大AI无疆",
         "thread_id": null
       },
       "enabled_toolsets": [
@@ -266,7 +222,7 @@
     },
     {
       "id": "bc8104f3e72b",
-      "name": "PVC2609\u671f\u8d27\u65e5\u76d8\u5f00\u76d8\u524d\u590d\u76d8\u9884\u6d4b",
+      "name": "PVC2609期货日盘开盘前复盘预测",
       "prompt": "",
       "skills": [],
       "skill": null,
@@ -300,7 +256,7 @@
       "origin": {
         "platform": "feishu",
         "chat_id": "oc_3b94cfb91274b70374954d7b12f12432",
-        "chat_name": "\u5927AI\u65e0\u7586",
+        "chat_name": "大AI无疆",
         "thread_id": null
       },
       "enabled_toolsets": [
@@ -310,7 +266,7 @@
     },
     {
       "id": "a65c3e27d9bf",
-      "name": "PVC2609\u671f\u8d27\u5348\u76d8\u5f00\u76d8\u524d\u590d\u76d8\u9884\u6d4b",
+      "name": "PVC2609期货午盘开盘前复盘预测",
       "prompt": "",
       "skills": [],
       "skill": null,
@@ -344,7 +300,7 @@
       "origin": {
         "platform": "feishu",
         "chat_id": "oc_3b94cfb91274b70374954d7b12f12432",
-        "chat_name": "\u5927AI\u65e0\u7586",
+        "chat_name": "大AI无疆",
         "thread_id": null
       },
       "enabled_toolsets": [
@@ -354,7 +310,7 @@
     },
     {
       "id": "dc3c6a72367a",
-      "name": "PVC2609\u671f\u8d27\u591c\u76d8\u5f00\u76d8\u524d\u590d\u76d8\u9884\u6d4b",
+      "name": "PVC2609期货夜盘开盘前复盘预测",
       "prompt": "",
       "skills": [],
       "skill": null,
@@ -388,7 +344,7 @@
       "origin": {
         "platform": "feishu",
         "chat_id": "oc_3b94cfb91274b70374954d7b12f12432",
-        "chat_name": "\u5927AI\u65e0\u7586",
+        "chat_name": "大AI无疆",
         "thread_id": null
       },
       "enabled_toolsets": [
@@ -398,7 +354,7 @@
     },
     {
       "id": "c4f28bbad195",
-      "name": "A\u80a1\u96c6\u5408\u7ade\u4ef7\u884c\u4e1a\u677f\u5757\u6c47\u603b",
+      "name": "A股集合竞价行业板块汇总",
       "prompt": "",
       "skills": [],
       "skill": null,
@@ -439,7 +395,51 @@
         "terminal"
       ],
       "workdir": "/Users/fenomenoronaldo/.hermes/skills/finance/stock-strategy-assistant"
+    },
+    {
+      "id": "f8b91c6a2609",
+      "name": "PVC2609期货自动化预检",
+      "prompt": "",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "pvc2609_automation_healthcheck.sh",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "20 8,12,20 * * 1-5",
+        "display": "20 8,12,20 * * 1-5"
+      },
+      "schedule_display": "20 8,12,20 * * 1-5",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-29T00:33:47.270095+08:00",
+      "next_run_at": "2026-06-29T08:20:00+08:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "feishu:ou_29f43af572af5354dcf63c44af9ca013",
+      "origin": {
+        "platform": "feishu",
+        "chat_id": "ou_29f43af572af5354dcf63c44af9ca013",
+        "chat_name": "DM",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant"
     }
   ],
-  "updated_at": "2026-06-26T23:59:04.649945+08:00"
+  "updated_at": "2026-06-29T00:48:21.365518+08:00"
 }
