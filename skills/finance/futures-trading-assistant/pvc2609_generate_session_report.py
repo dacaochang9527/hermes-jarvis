@@ -567,7 +567,11 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
     session_rows_3m = bars_for_session(klines.get(3, []), args.date, args.session)
     session_rows_15m = bars_for_session(klines.get(15, []), args.date, args.session)
     session_summary = summarize_bars(session_rows_3m or klines.get(3, [])[-80:])
-    levels = derive_levels(session_summary, quote, klines.get(15, []))
+    # Key levels must be derived from the reviewed session only.
+    # Using all historical 15m bars can promote stale/far resistance into the
+    # next-session near-term plan (e.g. 0629 morning wrongly lifted pressure to
+    # 4475-4495 instead of the session-local 4400 area).
+    levels = derive_levels(session_summary, quote, session_rows_15m)
     plan = build_plan_levels(levels)
     bias = infer_bias(session_summary, daily)
     next_session = args.next_session or DEFAULT_NEXT_SESSION[args.session]

@@ -54,6 +54,8 @@ Reusable futures report structure benchmarks, including time-slice forecast-vs-a
 
 PVC monitor troubleshooting patterns for cron wrappers, Sina quote fallback, bad-state cleanup, and manual scenario-level promotion are documented in `references/pvc-monitor-troubleshooting.md`.
 
+PVC2609 key-level hierarchy safeguards — including avoiding promotion of far/daily resistance into near-term intraday pressure, deriving next-session levels from the reviewed session's own 15m bars, and blocking automatic publishing when near resistance is too far from session high/close — are documented in `references/pvc-level-sanity-and-session-local-levels.md`.
+
 The current PVC2609 Feishu monitor configuration is `configs/pvc2609_feishu_monitor.yaml`.
 
 Current PVC2609 cron scripts:
@@ -296,6 +298,7 @@ Avoid language like:
 6. Sending >1000 blocks to the Feishu descendant API. The endpoint rejects large payloads; pre-trim the markdown (remove STATE_HANDOFF + optional sections like 小资金点数) before conversion to stay under the limit. The `publish_feishu_markdown_doc.py` script now uses single-shot with a 950-block guard — multi-call chunking does NOT work (error 1770041 "open schema mismatch") and was removed. If publishing fails, trim more aggressively and retry. See `references/feishu-publishing-limits.md`.
 7. Publishing a review report where the monitor loaded stale prediction levels from a prior plan. The monitor reads `latest_prediction_levels.json` at startup; if a new plan was generated but not deployed before the monitor started, alerts fire against old levels. Run `--update-levels` on the reviewed plan before the next session's monitor starts. If the gap cannot be closed, note the discrepancy in the review's Section 7.
 8. **Sina API blocks bare urllib requests.** The generate script (`pvc2609_generate_session_report.py`) uses `urllib.request` without a `Referer` header and will hang/time out. Sina requires `Referer: https://finance.sina.com.cn`. When the script fails, fall back to manual data collection with curl (see "Manual Data Collection Fallback" above). Consider fixing the script by adding the Referer header.
+9. **关键位层级错位会误导盘中计划。** 生成下一时段午盘/夜盘预测时，近端压力/支撑必须从“被复盘时段”的 15m K线推导，不能用全量历史15m直接取分位数，否则会把日K级别远端强反抽位（如 4475-4495）误写成近端压力。远端位可保留为“大级别修复门槛/远端观察”，但不能作为当前时段第一做空参考。自动发布前应做 sanity check：近端压力若距离复盘高点与收盘均超过约50点，阻止发布并要求人工复核。详见 `references/pvc-level-sanity-and-session-local-levels.md`.
 
 ## Verification Checklist
 

@@ -150,6 +150,32 @@ def publish_report(markdown_path: Path, title: str, dry_run: bool) -> dict:
     return payload
 
 
+def validate_level_sanity(markdown_path: Path) -> None:
+    """Block publishing if auto-generated near resistance is clearly stale/far.
+
+    This guard prevents repeating the 2026-06-29 morning failure where a daily/far
+    resistance band was promoted into the next-session near-term pressure zone.
+    """
+    text = markdown_path.read_text(encoding="utf-8")
+    summary_match = re.search(
+        r"K线开盘 / 最高 / 最低 / 收盘 \|\s*([0-9.]+)\s*/\s*([0-9.]+)\s*/\s*([0-9.]+)\s*/\s*([0-9.]+)",
+        text,
+    )
+    pressure_match = re.search(r"\| 近端压力 \|\s*([0-9]+)(?:-([0-9]+))?\s*\|", text)
+    if not summary_match or not pressure_match:
+        return
+    session_high = float(summary_match.group(2))
+    session_close = float(summary_match.group(4))
+    pressure_low = float(pressure_match.group(1))
+    # A near pressure more than ~50 points above both reviewed-session high and
+    # close is no longer "near" for this PVC intraday report; it requires manual review.
+    if pressure_low - session_high > 50 and pressure_low - session_close > 50:
+        raise RuntimeError(
+            f"关键位 sanity check failed：近端压力 {pressure_low:.0f} 距复盘高点 {session_high:.0f} / 收盘 {session_close:.0f} 超过50点，"
+            "疑似把远端压力误作近端压力，已阻止自动发布"
+        )
+
+
 def extract_summary(markdown_path: Path) -> str:
     text = markdown_path.read_text(encoding="utf-8")
     match = re.search(r"## 1\. 一句话结论\n\n(.+?)(?:\n\n##|$)", text, flags=re.DOTALL)
@@ -187,6 +213,7 @@ def main() -> int:
         review_date, next_date = resolve_dates(spec, target_date)
         output = report_path_for(target_date, spec, args.output_dir)
         report_path = generate_report(review_date, next_date, spec, output, update_levels=(not args.dry_run and not args.no_update_levels))
+        validate_level_sanity(report_path)
         title = f"PVC2609 {target_date:%Y-%m-%d} {spec.title_session}复盘+预测"
         published = publish_report(report_path, title, dry_run=args.dry_run)
         url = published.get("url") or published.get("document_url") or "URL生成失败"
