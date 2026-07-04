@@ -59,8 +59,9 @@ def session_has_bars(trading_date: date, session: str) -> bool:
     return bool(generator.bars_for_session(rows, trading_date, session))
 
 
-def latest_night_date(before_or_on: date, lookback_days: int = 10) -> date | None:
-    for offset in range(1, lookback_days + 1):
+def latest_night_date(before_or_on: date, lookback_days: int = 10, include_same_day: bool = False) -> date | None:
+    start_offset = 0 if include_same_day else 1
+    for offset in range(start_offset, lookback_days + 1):
         candidate = before_or_on - timedelta(days=offset)
         try:
             if session_has_bars(candidate, "night"):
@@ -70,11 +71,51 @@ def latest_night_date(before_or_on: date, lookback_days: int = 10) -> date | Non
     return None
 
 
+def next_day_after_available_night(after_date: date, lookahead_days: int = 10) -> date:
+    rows = generator.fetch_klines(3)
+    for offset in range(1, lookahead_days + 1):
+        candidate = after_date + timedelta(days=offset)
+        if generator.bars_for_session(rows, candidate, "day"):
+            return candidate
+    for offset in range(1, lookahead_days + 1):
+        candidate = after_date + timedelta(days=offset)
+        if candidate.weekday() < 5:
+            return candidate
+    return after_date + timedelta(days=1)
+
+
+def next_weekday(after_date: date) -> date:
+    for offset in range(1, 8):
+        candidate = after_date + timedelta(days=offset)
+        if candidate.weekday() < 5:
+            return candidate
+    return after_date + timedelta(days=1)
+
+
+def default_target_date(spec: TargetSpec, current: datetime | None = None) -> date:
+    current = current or now_cn()
+    today = current.date()
+    if spec.target != "morning":
+        return today
+    if (current.hour, current.minute) >= (23, 5):
+        return next_weekday(today)
+    review_date = latest_night_date(today, include_same_day=True)
+    if review_date is not None:
+        return next_day_after_available_night(review_date)
+    return today
+
+
 def resolve_dates(spec: TargetSpec, target_date: date) -> tuple[date, date]:
     if spec.target == "morning":
         review_date = latest_night_date(target_date)
         if review_date is None:
             raise RuntimeError(f"最近10天未找到可复盘夜盘K线，目标日 {target_date:%Y-%m-%d} 不发布正式报告")
+        expected_target = next_day_after_available_night(review_date)
+        if expected_target != target_date:
+            raise RuntimeError(
+                f"最近可用夜盘是 {review_date:%Y-%m-%d}，其下一日盘应为 {expected_target:%Y-%m-%d}；"
+                f"目标日 {target_date:%Y-%m-%d} 缺少前一夜盘K线，不发布正式报告"
+            )
         return review_date, target_date
     return target_date, target_date
 
@@ -208,7 +249,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     spec = TARGETS[args.target]
-    target_date = args.date or now_cn().date()
+    target_date = args.date or default_target_date(spec)
     try:
         review_date, next_date = resolve_dates(spec, target_date)
         output = report_path_for(target_date, spec, args.output_dir)

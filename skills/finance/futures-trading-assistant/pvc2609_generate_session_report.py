@@ -107,9 +107,12 @@ def parse_quote(raw: str) -> dict:
         raise ValueError(f"quote has too few fields: {fields}")
     time_raw = fields[1]
     raw_last = to_float(fields[5])
+    fallback_last = to_float(fields[8]) if len(fields) > 8 else math.nan
     bid = to_float(fields[6])
     ask = to_float(fields[7])
     last = raw_last
+    if math.isnan(last) or last <= 0:
+        last = fallback_last
     if math.isnan(last) or last <= 0:
         valid_quotes = [value for value in (bid, ask) if not math.isnan(value) and value > 0]
         if len(valid_quotes) == 2:
@@ -175,6 +178,10 @@ def fetch_daily() -> list[Bar]:
     return rows
 
 
+def valid_price(value: float) -> bool:
+    return value is not None and not math.isnan(value) and value > 0
+
+
 def bars_for_session(rows: list[Bar], trading_date: date, session: str) -> list[Bar]:
     windows = SESSION_WINDOWS[session]
     filtered = []
@@ -202,6 +209,80 @@ def summarize_bars(rows: list[Bar]) -> dict:
         "start": rows[0].dt,
         "end": rows[-1].dt,
     }
+
+
+def value_or(primary: float, fallback: float) -> float:
+    return primary if valid_price(primary) else fallback
+
+
+def apply_realtime_night_session_summary(summary: dict, quote: dict, review_date: date, session: str) -> dict:
+    if session != "night":
+        return summary
+    quote_dt = quote.get("quote_dt")
+    if not isinstance(quote_dt, datetime):
+        return summary
+    if quote_dt.date() != review_date or quote_dt.time() < time(21, 0):
+        return summary
+
+    open_ = value_or(quote.get("open", math.nan), summary["open"])
+    high = value_or(quote.get("high", math.nan), summary["high"])
+    low = value_or(quote.get("low", math.nan), summary["low"])
+    close = value_or(quote.get("last", math.nan), summary["close"])
+    if any(not valid_price(value) for value in (open_, high, low, close)):
+        return summary
+
+    realtime = dict(summary)
+    realtime.update({
+        "open": open_,
+        "high": max(high, open_, close),
+        "low": min(low, open_, close),
+        "close": close,
+    })
+    return realtime
+
+
+def apply_realtime_night_daily(
+    daily: list[Bar],
+    quote: dict,
+    session_summary: dict,
+    review_date: date,
+    session: str,
+    next_date: date,
+) -> list[Bar]:
+    if session != "night":
+        return daily
+    quote_dt = quote.get("quote_dt")
+    if not isinstance(quote_dt, datetime):
+        return daily
+    if quote_dt.date() != review_date or quote_dt.time() < time(21, 0):
+        return daily
+
+    open_ = value_or(quote.get("open", math.nan), session_summary["open"])
+    high = value_or(quote.get("high", math.nan), session_summary["high"])
+    low = value_or(quote.get("low", math.nan), session_summary["low"])
+    close = value_or(quote.get("last", math.nan), session_summary["close"])
+    if any(not valid_price(value) for value in (open_, high, low, close)):
+        return daily
+
+    high = max(high, open_, close)
+    low = min(low, open_, close)
+    bar_dt = datetime.combine(next_date, time(0, 0)).replace(tzinfo=TZ)
+    realtime_bar = Bar(
+        bar_dt,
+        open_,
+        high,
+        low,
+        close,
+        to_float(quote.get("volume"), session_summary["volume"]),
+        to_float(quote.get("open_interest"), session_summary["oi_end"]),
+    )
+
+    rows = list(daily)
+    if rows and rows[-1].dt and rows[-1].dt.date() == next_date:
+        rows[-1] = realtime_bar
+    elif not rows or rows[-1].dt is None or rows[-1].dt.date() < next_date:
+        rows.append(realtime_bar)
+    return rows
 
 
 def moving_average(rows: list[Bar], length: int) -> float:
@@ -566,7 +647,11 @@ def build_plan_levels(levels: dict) -> dict[str, float]:
 def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[Bar]], daily: list[Bar], prior_report: Path | None) -> tuple[str, dict]:
     session_rows_3m = bars_for_session(klines.get(3, []), args.date, args.session)
     session_rows_15m = bars_for_session(klines.get(15, []), args.date, args.session)
-    session_summary = summarize_bars(session_rows_3m or klines.get(3, [])[-80:])
+    kline_session_summary = summarize_bars(session_rows_3m or klines.get(3, [])[-80:])
+    session_summary = apply_realtime_night_session_summary(kline_session_summary, quote, args.date, args.session)
+    next_session = args.next_session or DEFAULT_NEXT_SESSION[args.session]
+    next_date = args.next_date or (args.date + timedelta(days=1) if args.session == "night" and next_session == "next_day_day" else args.date)
+    daily = apply_realtime_night_daily(daily, quote, session_summary, args.date, args.session, next_date)
     # Key levels must be derived from the reviewed session only.
     # Using all historical 15m bars can promote stale/far resistance into the
     # next-session near-term plan (e.g. 0629 morning wrongly lifted pressure to
@@ -574,8 +659,6 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
     levels = derive_levels(session_summary, quote, session_rows_15m)
     plan = build_plan_levels(levels)
     bias = infer_bias(session_summary, daily)
-    next_session = args.next_session or DEFAULT_NEXT_SESSION[args.session]
-    next_date = args.next_date or (args.date + timedelta(days=1) if args.session == "night" and next_session == "next_day_day" else args.date)
     source_doc = relative_report_path(args.output) if args.output else f"reports/{default_report_name(args.date, args.session)}"
     generated_at = now_cn()
     quote_stale = "是" if quote["quote_dt"].date() != args.date else "否"

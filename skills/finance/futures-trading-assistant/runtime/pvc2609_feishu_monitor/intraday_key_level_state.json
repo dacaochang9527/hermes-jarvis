@@ -101,6 +101,158 @@
           "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260630_intraday_night_2227_key_level_break_up_4430.md"
         }
       ]
+    },
+    "20260701:morning": {
+      "report_count": 2,
+      "triggered_levels": [
+        {
+          "price": 4425.0,
+          "role": "support",
+          "event_key": "key_level_break_down",
+          "triggered_at": "2026-07-01T09:24:59.687575+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260701_intraday_morning_0924_key_level_break_down_4425.md"
+        },
+        {
+          "price": 4435.0,
+          "role": "repair_confirmation",
+          "event_key": "key_level_break_up",
+          "triggered_at": "2026-07-01T09:48:18.226142+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260701_intraday_morning_0948_key_level_break_up_4435.md"
+        }
+      ]
+    },
+    "20260701:afternoon": {
+      "report_count": 1,
+      "triggered_levels": [
+        {
+          "price": 4430.0,
+          "role": "midline_low",
+          "event_key": "key_level_break_down",
+          "triggered_at": "2026-07-01T13:54:15.159555+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260701_intraday_afternoon_1354_key_level_break_down_4430.md"
+        }
+      ]
+    },
+    "20260702:morning": {
+      "report_count": 3,
+      "triggered_levels": [
+        {
+          "price": 4390.0,
+          "role": "support",
+          "event_key": "key_level_break_down",
+          "triggered_at": "2026-07-02T09:12:16.402748+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260702_intraday_morning_0912_key_level_break_down_4390.md"
+        },
+        {
+          "price": 4380.0,
+          "role": "midline",
+          "event_key": "key_level_break_up",
+          "triggered_at": "2026-07-02T09:42:37.763804+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260702_intraday_morning_0942_key_level_break_up_4380.md"
+        },
+        {
+          "price": 4370.0,
+          "role": "failure_confirmation",
+          "event_key": "key_level_break_down",
+          "triggered_at": "2026-07-02T10:45:12.197130+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260702_intraday_morning_1045_key_level_break_down_4370.md"
+        }
+      ]
+    },
+    "20260702:afternoon": {
+      "report_count": 2,
+      "triggered_levels": [
+        {
+          "price": 4385.0,
+          "role": "resistance",
+          "event_key": "key_level_break_up",
+          "triggered_at": "2026-07-02T13:57:37.303647+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260702_intraday_afternoon_1357_key_level_break_up_4385.md"
+        },
+        {
+          "price": 4375.0,
+          "role": "failure_confirmation",
+          "event_key": "key_level_break_down",
+          "triggered_at": "2026-07-02T14:48:19.594367+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260702_intraday_afternoon_1448_key_level_break_down_4375.md"
+        }
+      ]
+    },
+    "20260702:night": {
+      "report_count": 3,
+      "triggered_levels": [
+        {
+          "price": 4390.0,
+          "role": "resistance",
+          "event_key": "key_level_break_down",
+          "triggered_at": "2026-07-02T21:33:58.014463+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260702_intraday_night_2133_key_level_break_down_4390.md"
+        },
+        {
+          "price": 4400.0,
+          "role": "repair_confirmation",
+          "event_key": "key_level_break_up",
+          "triggered_at": "2026-07-02T21:39:08.659762+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260702_intraday_night_2139_key_level_break_up_4400.md"
+        },
+        {
+          "price": 4415.0,
+          "role": "repair_confirmation",
+          "event_key": "key_level_break_up",
+          "triggered_at": "2026-07-02T21:51:24.083930+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260702_intraday_night_2151_key_level_break_up_4415.md"
+        }
+      ]
+    },
+    "20260703:morning": {
+      "report_count": 1,
+      "triggered_levels": [
+        {
+          "price": 4435.0,
+          "role": "resistance",
+          "event_key": "key_level_break_down",
+          "triggered_at": "2026-07-03T09:09:09.434188+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260703_intraday_morning_0909_key_level_break_down_4435.md"
+        }
+      ]
+    },
+    "20260703:afternoon": {
+      "report_count": 2,
+      "triggered_levels": [
+        {
+          "price": 4465.0,
+          "role": "resistance",
+          "event_key": "key_level_break_up",
+          "triggered_at": "2026-07-03T13:57:25.487218+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260703_intraday_afternoon_1357_key_level_break_up_4465.md"
+        },
+        {
+          "price": 4450.0,
+          "role": "failure_confirmation",
+          "event_key": "key_level_break_down",
+          "triggered_at": "2026-07-03T14:27:46.114675+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260703_intraday_afternoon_1427_key_level_break_down_4450.md"
+        }
+      ]
+    },
+    "20260703:night": {
+      "report_count": 2,
+      "triggered_levels": [
+        {
+          "price": 4470.0,
+          "role": "resistance",
+          "event_key": "key_level_break_up",
+          "triggered_at": "2026-07-03T21:15:21.901234+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260703_intraday_night_2115_key_level_break_up_4470.md"
+        },
+        {
+          "price": 4485.0,
+          "role": "repair_confirmation",
+          "event_key": "key_level_break_up",
+          "triggered_at": "2026-07-03T22:00:55.682719+08:00",
+          "report": "/Users/fenomenoronaldo/.hermes/skills/finance/futures-trading-assistant/reports/pvc2609_20260703_intraday_night_2200_key_level_break_up_4485.md"
+        }
+      ]
     }
   }
 }

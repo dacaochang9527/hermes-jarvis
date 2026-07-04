@@ -36,8 +36,12 @@ LOG_PATH = RUNTIME_DIR / "automation_healthcheck.jsonl"
 TZ = ZoneInfo("Asia/Shanghai")
 
 GROUP_DELIVER = "feishu:oc_3b94cfb91274b70374954d7b12f12432"
-TARGET_BY_HOUR = {8: "morning", 12: "afternoon", 20: "night"}
-TARGET_LABELS = {"morning": "日盘开盘前", "afternoon": "午盘开盘前", "night": "夜盘开盘前"}
+TARGET_BY_HOUR_MINUTE = {
+    (11, 35): "afternoon",
+    (15, 5): "night",
+    (23, 5): "morning",
+}
+TARGET_LABELS = {"morning": "夜盘收盘后次日日盘", "afternoon": "上午收盘后午盘", "night": "日盘收盘后夜盘"}
 PREOPEN_SCRIPTS = {
     "morning": "pvc2609_morning_preopen_report.sh",
     "afternoon": "pvc2609_afternoon_preopen_report.sh",
@@ -45,9 +49,16 @@ PREOPEN_SCRIPTS = {
 }
 ENABLED_JOBS = {
     "PVC2609期货盘中关键位操作重估": "pvc2609_intraday_key_level_report.sh",
-    "PVC2609期货日盘开盘前复盘预测": "pvc2609_morning_preopen_report.sh",
-    "PVC2609期货午盘开盘前复盘预测": "pvc2609_afternoon_preopen_report.sh",
-    "PVC2609期货夜盘开盘前复盘预测": "pvc2609_night_preopen_report.sh",
+    "PVC2609期货夜盘收盘后次日日盘复盘预测": "pvc2609_morning_preopen_report.sh",
+    "PVC2609期货上午收盘后午盘复盘预测": "pvc2609_afternoon_preopen_report.sh",
+    "PVC2609期货日盘收盘后夜盘复盘预测": "pvc2609_night_preopen_report.sh",
+}
+
+EXPECTED_CRON_EXPR = {
+    "PVC2609期货盘中关键位操作重估": "*/3 9-15,21-23 * * 1-5",
+    "PVC2609期货夜盘收盘后次日日盘复盘预测": "10 23 * * 1-5",
+    "PVC2609期货上午收盘后午盘复盘预测": "40 11 * * 1-5",
+    "PVC2609期货日盘收盘后夜盘复盘预测": "10 15 * * 1-5",
 }
 
 
@@ -68,7 +79,7 @@ def parse_yyyymmdd(value: str) -> date:
 
 def select_target() -> str:
     current = now_cn()
-    return TARGET_BY_HOUR.get(current.hour, "skip")
+    return TARGET_BY_HOUR_MINUTE.get((current.hour, current.minute), "skip")
 
 
 def run_check(name: str, fn) -> CheckResult:
@@ -148,8 +159,12 @@ def check_cron_config() -> str:
             raise RuntimeError(f"{name} script mismatch: {job.get('script')} != {script}")
         if job.get("deliver") != GROUP_DELIVER:
             raise RuntimeError(f"{name} deliver mismatch: {job.get('deliver')}")
-        if not (job.get("schedule") or {}).get("expr"):
+        expr = (job.get("schedule") or {}).get("expr")
+        if not expr:
             raise RuntimeError(f"{name} schedule missing")
+        expected_expr = EXPECTED_CRON_EXPR.get(name)
+        if expected_expr and expr != expected_expr:
+            raise RuntimeError(f"{name} schedule mismatch: {expr} != {expected_expr}")
 
     disabled = [
         job.get("name")
@@ -357,7 +372,7 @@ def main() -> int:
             "skipped": "outside pre-flight windows",
         })
         if args.verbose:
-            print(f"PVC2609 自动化预检跳过：当前不在 08/12/20 点预检窗口（{now_cn().strftime('%H:%M')}）。")
+            print(f"PVC2609 自动化预检跳过：当前不在 11:35/15:05/23:05 预检窗口（{now_cn().strftime('%H:%M')}）。")
         return 0
     targets = list(preopen.TARGETS) if target == "all" else [target]
 
