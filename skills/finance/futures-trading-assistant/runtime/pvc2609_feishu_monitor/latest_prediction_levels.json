@@ -1,41 +1,41 @@
 {
   "contract": "PVC2609",
-  "source_doc": "reports/pvc2609_20260706_morning_preopen_review_forecast.md",
-  "updated_at": "2026-07-04T01:18:57.281035+08:00",
+  "source_doc": "reports/pvc2609_20260708_morning_preopen_review_forecast.md",
+  "updated_at": "2026-07-07T23:10:43.846577+08:00",
   "session": "morning",
   "levels": [
     {
-      "price": 4455,
+      "price": 4415,
       "role": "support",
       "label": "本阶段低点/再破确认位",
       "direction": "down"
     },
     {
-      "price": 4465,
+      "price": 4420,
       "role": "weakness_confirmation",
       "label": "近端支撑/修复失败观察",
       "direction": "both"
     },
     {
-      "price": 4475,
+      "price": 4440,
       "role": "midline_low",
       "label": "短线中轴下沿",
       "direction": "both"
     },
     {
-      "price": 4490,
+      "price": 4450,
       "role": "resistance",
       "label": "压力区下沿/承压观察",
       "direction": "both"
     },
     {
-      "price": 4510,
+      "price": 4470,
       "role": "repair_confirmation",
       "label": "修复延续确认位",
       "direction": "up"
     },
     {
-      "price": 4520,
+      "price": 4480,
       "role": "major_resistance",
       "label": "大级别修复门槛",
       "direction": "up"
