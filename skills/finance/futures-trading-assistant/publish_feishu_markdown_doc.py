@@ -174,6 +174,15 @@ def publish(markdown_path: Path, title: str | None, title_suffix: str | None, no
     if not url:
         raise PublishError("Metadata verification returned no URL")
 
+    raw_content_response = api_request(
+        "GET",
+        f"/open-apis/docx/v1/documents/{document_id}/raw_content",
+        token,
+    )
+    raw_content = raw_content_response.get("data", {}).get("content") or ""
+    if not raw_content.strip():
+        raise PublishError("Raw-content verification returned an empty document")
+
     if not no_patch:
         patch_markdown_link(markdown_path, url)
 
@@ -185,6 +194,7 @@ def publish(markdown_path: Path, title: str | None, title_suffix: str | None, no
         "patched_local_report": not no_patch,
         "top_level_blocks": len(first_level_ids),
         "total_blocks": len(blocks),
+        "raw_content_chars": len(raw_content),
         "permission": permission.get("data", {}).get("permission_public", {}),
     }
 

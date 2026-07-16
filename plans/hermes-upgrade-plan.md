@@ -55,7 +55,6 @@ Remote origin     →  git@github.com:dacaochang9527/hermes-jarvis.git
 | 配置项 | 当前值 | 升级注意 |
 |--------|--------|----------|
 | `model.default` | `deepseek/deepseek-v4-flash` + provider `deepseek` | doctor 警告 slug 格式；v0.16+ 模型 picker 行为变化 |
-| `auxiliary.vision` | sub2api / **gpt-5.5** | v0.17 对 gpt-5.5 Codex OAuth 压缩阈值调至 85% |
 | `compression.codex_gpt55_autoraise` | `true` | 与 v0.17 压缩策略一致，升级后观察上下文占用 |
 | `delegation.child_timeout_seconds` | `600` | v0.17 **移除默认子代理 wall-clock 超时**；本机显式配置仍有效 |
 

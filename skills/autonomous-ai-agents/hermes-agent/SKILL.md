@@ -157,6 +157,8 @@ Feishu group messaging setup, permissions, and verification notes: `references/f
 
 Feishu bot-owned cloud document/report creation, upload, collaborator, link-sharing, and group-send permissions: `references/feishu-bot-cloud-doc-permissions.md`.
 
+Feishu historical document inventory/export workflow — scanning Hermes session history for `docx` links, de-duplicating tokens, verifying metadata, and downloading `raw_content` Markdown backups with a manifest — is documented in `references/feishu-doc-inventory-export.md`.
+
 ### Sessions
 
 ```

@@ -4,7 +4,7 @@ Session learning: OpenClaw and Hermes can both use the same OpenAI-compatible mu
 
 Observed symptoms:
 
-- Main chat works with `model.provider: sub2api` and `model.default: gpt-5.5`.
+- Main chat works with `model.provider: customgpt` and `model.default: gpt-5.5`.
 - Vision fails with logs like:
   - `resolve_provider_client: custom/main requested but no endpoint credentials found`
   - `Vision provider main unavailable, falling back to auto vision backends`
@@ -15,7 +15,7 @@ Useful comparison source:
 
 - If OpenClaw on the same machine can read images, inspect `~/.openclaw/openclaw.json` and compare its `models.providers.<provider>` block.
 - The durable fields to mirror into Hermes are:
-  - provider name, e.g. `sub2api`
+  - provider name, e.g. `customgpt`
   - `baseUrl` / `base_url`
   - API key or env var
   - model id, e.g. `gpt-5.5`
@@ -26,13 +26,13 @@ Hermes fix pattern:
 ```yaml
 model:
   default: gpt-5.5
-  provider: sub2api
+  provider: customgpt
   base_url: http://example/v1
   api_mode: chat_completions
 
 providers:
-  sub2api:
-    name: sub2api
+  customgpt:
+    name: customgpt
     base_url: http://example/v1
     key_env: SUB2API_API_KEY
     api_mode: chat_completions
@@ -40,7 +40,7 @@ providers:
 
 auxiliary:
   vision:
-    provider: sub2api
+    provider: customgpt
     model: gpt-5.5
     base_url: http://example/v1
     api_key: ${SUB2API_API_KEY}  # config loader expands ${VAR}; avoids storing the raw secret

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Generate PVC2609 day/night review + next-session plan Markdown drafts.
+"""Generate PVC2609 day/night review + next-session plan Markdown reports.
 
 The generator fetches public Sina quote/K-line data, reads local monitor logs,
 and writes a structured report skeleton matching the futures session-state chain.
-It is intentionally conservative: generated conclusions are marked as drafts and
-should be reviewed before publishing or trading from them.
+Generated reports are promoted to production only after the publisher's machine
+quality gate succeeds.  Ambiguous or inconsistent reports remain drafts and are
+sent to manual review instead of being published.
 """
 from __future__ import annotations
 
@@ -63,6 +64,26 @@ class Bar:
     close: float
     volume: float
     open_interest: float
+
+
+@dataclass(frozen=True)
+class ScenarioPlan:
+    scenario_id: str
+    name: str
+    direction: str
+    focus: str
+    entry_condition: str
+    invalidation: str
+    target1: str
+    target2: str
+    probability: str
+    evidence: str
+    risk: str
+    entry_low: float | None = None
+    entry_high: float | None = None
+    stop_anchor: float | None = None
+    target1_anchor: float | None = None
+    target2_anchor: float | None = None
 
 
 def now_cn() -> datetime:
@@ -241,7 +262,7 @@ def apply_realtime_night_session_summary(summary: dict, quote: dict, review_date
     return realtime
 
 
-def apply_realtime_night_daily(
+def apply_realtime_session_daily(
     daily: list[Bar],
     quote: dict,
     session_summary: dict,
@@ -249,12 +270,13 @@ def apply_realtime_night_daily(
     session: str,
     next_date: date,
 ) -> list[Bar]:
-    if session != "night":
+    if session not in ("day", "night"):
         return daily
     quote_dt = quote.get("quote_dt")
     if not isinstance(quote_dt, datetime):
         return daily
-    if quote_dt.date() != review_date or quote_dt.time() < time(21, 0):
+    minimum_time = time(15, 0) if session == "day" else time(21, 0)
+    if quote_dt.date() != review_date or quote_dt.time() < minimum_time:
         return daily
 
     open_ = value_or(quote.get("open", math.nan), session_summary["open"])
@@ -266,7 +288,8 @@ def apply_realtime_night_daily(
 
     high = max(high, open_, close)
     low = min(low, open_, close)
-    bar_dt = datetime.combine(next_date, time(0, 0)).replace(tzinfo=TZ)
+    bar_date = review_date if session == "day" else next_date
+    bar_dt = datetime.combine(bar_date, time(0, 0)).replace(tzinfo=TZ)
     realtime_bar = Bar(
         bar_dt,
         open_,
@@ -278,11 +301,15 @@ def apply_realtime_night_daily(
     )
 
     rows = list(daily)
-    if rows and rows[-1].dt and rows[-1].dt.date() == next_date:
+    if rows and rows[-1].dt and rows[-1].dt.date() == bar_date:
         rows[-1] = realtime_bar
-    elif not rows or rows[-1].dt is None or rows[-1].dt.date() < next_date:
+    elif not rows or rows[-1].dt is None or rows[-1].dt.date() < bar_date:
         rows.append(realtime_bar)
     return rows
+
+
+# Backward-compatible alias for callers that imported the old helper name.
+apply_realtime_night_daily = apply_realtime_session_daily
 
 
 def moving_average(rows: list[Bar], length: int) -> float:
@@ -373,9 +400,15 @@ def read_jsonl(path: Path, trading_date: date, session: str, limit: int = 8) -> 
 
 def find_prior_report(trading_date: date, session: str) -> Path | None:
     if session == "night":
-        candidates = [REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_day_review_night_plan.md"]
+        candidates = [
+            REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_night_preopen_review_forecast.md",
+            REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_day_review_night_plan.md",
+        ]
     elif session == "morning":
-        candidates = [REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_morning_preopen_review_forecast.md"]
+        candidates = [
+            REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_morning_preopen_review_forecast.md",
+            REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_night_review_next_day_plan.md",
+        ]
         candidates.extend(
             REPORTS_DIR / f"pvc2609_{trading_date - timedelta(days=offset):%Y%m%d}_night_review_next_day_plan.md"
             for offset in range(1, 8)
@@ -383,6 +416,8 @@ def find_prior_report(trading_date: date, session: str) -> Path | None:
     else:
         previous = trading_date - timedelta(days=1)
         candidates = [
+            REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_afternoon_preopen_review_forecast.md",
+            REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_morning_preopen_review_forecast.md",
             REPORTS_DIR / f"pvc2609_{previous:%Y%m%d}_night_review_next_day_plan.md",
             REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_night_review_next_day_plan.md",
         ]
@@ -406,40 +441,65 @@ def derive_levels(summary: dict, quote: dict, rows_15m: list[Bar]) -> dict:
     session_low = summary["low"] if not math.isnan(summary["low"]) else quote["low"]
     session_high = summary["high"] if not math.isnan(summary["high"]) else quote["high"]
     close = summary["close"] if not math.isnan(summary["close"]) else quote["last"]
-    recent = rows_15m[-32:] if len(rows_15m) >= 8 else rows_15m
-    if recent:
-        lows = sorted(row.low for row in recent)
-        highs = sorted(row.high for row in recent)
-        support = lows[max(0, int(len(lows) * 0.25) - 1)]
-        resistance = highs[min(len(highs) - 1, int(len(highs) * 0.75))]
-    else:
-        support = session_low
-        resistance = session_high
-    if support >= close:
-        support = min(session_low, close - 8)
-    if resistance <= close:
-        resistance = max(session_high, close + 8)
+    session_range = max(session_high - session_low, 1.0)
+    near_distance_limit = min(50.0, max(20.0, session_range * 0.35))
+    recent = rows_15m[-6:]
+    nearby_candidates = [math.ceil(close / 5.0) * 5.0]
+    for row in recent:
+        for value in (row.close, row.high):
+            rounded = round(value / 5.0) * 5.0
+            if close < rounded <= close + near_distance_limit:
+                nearby_candidates.append(rounded)
+    near_low = min(nearby_candidates) if nearby_candidates else math.ceil(close / 5.0) * 5.0
+    near_low = max(near_low, math.ceil(close / 5.0) * 5.0)
+    near_high = near_low + 10.0
+    core_low = near_high + 10.0
+    core_high = core_low + 10.0
+    far_mid = round(session_high / 5.0) * 5.0
+    far_low = max(core_high + 10.0, far_mid - 5.0)
+    far_high = max(far_low + 10.0, far_mid + 5.0)
+    support = min(session_low, close - 8.0)
+    resistance = near_low
     return {
         "close": close,
         "session_low": session_low,
         "session_high": session_high,
         "support": support,
         "resistance": resistance,
-        "upper_confirm": resistance + 12,
+        "near_resistance_low": near_low,
+        "near_resistance_high": near_high,
+        "core_resistance_low": core_low,
+        "core_resistance_high": core_high,
+        "far_resistance_low": far_low,
+        "far_resistance_high": far_high,
+        "near_distance_limit": near_distance_limit,
+        "upper_confirm": core_high,
         "lower_confirm": support - 12,
     }
 
 
-def infer_bias(summary: dict, daily: list[Bar]) -> str:
+def infer_bias(summary: dict, daily: list[Bar], rows_3m: list[Bar] | None = None, rows_15m: list[Bar] | None = None) -> str:
     close = summary["close"]
     open_ = summary["open"]
     ma5 = moving_average(daily, 5)
     if math.isnan(close) or math.isnan(open_):
         return "range"
+    high = summary["high"]
+    low = summary["low"]
+    session_range = max(high - low, 1.0)
+    close_location = (close - low) / session_range
+    recent_rows = (rows_3m or [])[-6:] or (rows_15m or [])[-4:]
+    recent_move = recent_rows[-1].close - recent_rows[0].close if len(recent_rows) >= 2 else close - open_
+    clear_rejection = high - close >= max(20.0, session_range * 0.35)
+    clear_recovery = close - low >= max(20.0, session_range * 0.35)
+    if close_location <= 0.15 and clear_rejection and (close <= open_ or recent_move <= -12):
+        return "bearish"
+    if close_location >= 0.85 and clear_recovery and (close >= open_ or recent_move >= 12):
+        return "repair"
+    if close < open_ and (open_ - close >= max(12.0, session_range * 0.20) or (not math.isnan(ma5) and close < ma5)):
+        return "bearish"
     if not math.isnan(ma5) and close < ma5 and close > open_:
         return "range_repair"
-    if not math.isnan(ma5) and close < ma5 and close <= open_:
-        return "bearish"
     if close > open_:
         return "repair"
     return "range"
@@ -453,6 +513,18 @@ def price_token(value: float | str) -> str:
 
 
 def price_band(low: float, high: float) -> str:
+    return f"{fmt_price(low)}-{fmt_price(high)}"
+
+
+def price_span(first: float, second: float) -> str:
+    if not valid_price(first):
+        return fmt_price(second)
+    if not valid_price(second):
+        return fmt_price(first)
+    low = min(first, second)
+    high = max(first, second)
+    if abs(high - low) < 0.5:
+        return fmt_price(low)
     return f"{fmt_price(low)}-{fmt_price(high)}"
 
 
@@ -567,6 +639,38 @@ def extract_prior_scenarios(path: Path | None) -> list[dict[str, str]]:
     if path is None or not path.exists():
         return fallback
     text = path.read_text(encoding="utf-8", errors="ignore")
+    probability_section = re.search(
+        r"##\s*12\..*?情景概率表\s*\n(.*?)(?=\n###|\n##\s*13\.|\Z)",
+        text,
+        re.DOTALL,
+    )
+    if probability_section:
+        parsed: list[dict[str, object]] = []
+        for line in probability_section.group(1).splitlines():
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            if len(cells) < 6 or not re.match(r"^[A-D][：:]", cells[0]):
+                continue
+            scenario_id = cells[0][0]
+            name = f"方案 {scenario_id}：{cells[0][2:].strip()}"
+            direction = "short"
+            if "修复延续" in cells[0] or (cells[1].lstrip().startswith("站稳") and "不能站稳" not in cells[1]):
+                direction = "long"
+            entry_levels = [float(value) for value in re.findall(r"(?<!\d)(4\d{3})(?!\d)", cells[0])]
+            if not entry_levels:
+                entry_levels = [float(value) for value in re.findall(r"(?<!\d)(4\d{3})(?!\d)", cells[1])]
+            if direction == "long" and entry_levels:
+                entry_levels = entry_levels[:1]
+            invalidation_levels = [float(value) for value in re.findall(r"(?<!\d)(4\d{3})(?!\d)", cells[5])]
+            parsed.append({
+                "scenario_id": scenario_id,
+                "name": name[:60],
+                "trigger": cells[1],
+                "direction": direction,
+                "entry_levels": entry_levels,
+                "invalidation_levels": invalidation_levels,
+            })
+        if len(parsed) == 4:
+            return parsed
     scenarios: list[dict[str, str]] = []
     patterns = [
         ("方案 A", r'方案\s*A[^\n#|：:]*[：:]?([^\n|]*)'),
@@ -583,7 +687,8 @@ def extract_prior_scenarios(path: Path | None) -> list[dict[str, str]]:
             direction = "long"
         if "跌破" in name or "破位" in name:
             direction = "short"
-        scenarios.append({"name": name[:42], "trigger": infer_trigger_from_name(name), "direction": direction})
+        entry_levels = [float(value) for value in re.findall(r"(?<!\d)(4\d{3})(?!\d)", name)]
+        scenarios.append({"scenario_id": label[-1], "name": name[:42], "trigger": infer_trigger_from_name(name), "direction": direction, "entry_levels": entry_levels, "invalidation_levels": []})
     return scenarios or fallback
 
 
@@ -599,49 +704,175 @@ def infer_trigger_from_name(name: str) -> str:
     return "按前序计划触发条件核对"
 
 
-def evaluate_scenario(scenario: dict[str, str], levels: dict, summary: dict) -> tuple[str, str, str]:
+def evaluate_scenario(scenario: dict[str, object], rows_3m: list[Bar], summary: dict) -> tuple[str, str, str]:
     high = summary["high"]
     low = summary["low"]
     close = summary["close"]
     direction = scenario.get("direction", "range")
-    if direction == "short" and not math.isnan(low) and low <= levels["session_low"] + 1 and close > levels["support"]:
-        return "部分触发但延续失败", "有低位刺破/下探，但随后收回支撑或中轴，破位延续确认不足", "第一根急跌不能追，必须等反抽不过"
-    if direction == "short" and high >= levels["resistance"] and close < levels["resistance"]:
-        return "基本触发", "价格进入压力区后未能继续站稳", "可按承压转弱处理，但止损必须贴近确认位"
-    if direction in ("repair", "long") and close >= levels["close"] and high >= levels["resistance"]:
-        return "基本相符", "低位未延续下行，后段收回中轴并逼近/突破压力区", "只按修复处理，不直接定义趋势反转"
-    if direction == "long" and close < levels["upper_confirm"]:
-        return "部分触及但未确认", "修复出现，但尚未站稳上方确认位", "下一阶段继续观察确认位能否被收回"
-    return "未充分触发", "实际路径没有满足完整触发链条", "未触发也要记录，避免事后归因"
+    entry_levels = [float(value) for value in scenario.get("entry_levels", []) if valid_price(float(value))]
+    invalidation_levels = [float(value) for value in scenario.get("invalidation_levels", []) if valid_price(float(value))]
+    if not entry_levels:
+        return "未触发", "前序方案未提取到可验证触发位，不能事后补写命中", "保留为未触发并降级到人工复核"
+    trigger_level = entry_levels[0] if direction == "long" else min(entry_levels)
+    name = str(scenario.get("name", ""))
+    rejection_short = direction == "short" and "承压" in name
+    trigger_indices: list[int] = []
+    for index, row in enumerate(rows_3m):
+        if direction == "long" and row.high >= trigger_level:
+            trigger_indices.append(index)
+        elif rejection_short and row.high >= trigger_level:
+            trigger_indices.append(index)
+        elif direction == "short" and not rejection_short and row.low <= max(entry_levels):
+            trigger_indices.append(index)
+    if not trigger_indices:
+        return "未触发", f"价格未到达前序触发位 {fmt_price(trigger_level)}", "未触发不是失效，不做事后归因"
+    any_invalidated = False
+    for trigger_index in trigger_indices:
+        after_trigger = rows_3m[trigger_index:]
+        invalidated = False
+        if invalidation_levels:
+            invalidation = min(invalidation_levels)
+            invalidated = any(row.high >= invalidation for row in after_trigger[1:]) if direction == "short" else any(row.low <= invalidation for row in after_trigger[1:])
+        any_invalidated = any_invalidated or invalidated
+        if direction == "long":
+            confirmed = any(row.close >= trigger_level for row in after_trigger) and close >= trigger_level
+        else:
+            confirm_level = min(entry_levels) if rejection_short else max(entry_levels)
+            confirmed = close <= confirm_level - 2 or any(row.close <= confirm_level - 2 for row in after_trigger)
+        if confirmed and not invalidated:
+            if direction == "long":
+                return "触发且确认", "价格到达确认位后收盘仍在其上，触发链完整", "按计划处理，但仍需执行止损"
+            return "触发且确认", "价格满足前序触发位并在后续3m路径中继续走弱", "计划有效，执行仍需等待确认而非追第一根"
+    if direction == "long":
+        return ("触发后失败" if any_invalidated else "部分触发", "价格触及修复位但收盘未能站稳", "不能把触及写成趋势反转")
+    if any_invalidated:
+        return "触发后失败", "触发后价格越过前序失效位，且未形成新的有效确认", "按止损/失效处理，不把触发等同命中"
+    return "部分触发", "价格到达触发位但后续确认不足", "继续等待反抽不过或收线确认"
 
 
 def build_plan_levels(levels: dict) -> dict[str, float]:
     low = levels["session_low"]
     high = levels["session_high"]
     close = levels["close"]
-    support = nearest_5(min(levels["support"], close - 10))
-    pivot_low = nearest_5(min(close, levels["resistance"] - 10))
-    pivot_high = nearest_5(max(close, pivot_low + 10))
-    pressure_low = nearest_5(max(levels["resistance"], close + 5))
-    pressure_high = nearest_5(max(levels["upper_confirm"], pressure_low + 10))
-    repair_confirm = nearest_5(pressure_high + 10)
-    major_resistance = nearest_5(repair_confirm + 10)
-    breakdown_target = nearest_5(min(levels["lower_confirm"], low - 10))
+    rounded_low = nearest_5(low)
+    support = nearest_5(min(levels["support"], close - 8))
+    if support >= rounded_low:
+        support = rounded_low - 10
+    pivot_low = nearest_5(close)
+    pivot_high = nearest_5(max(close + 5, pivot_low + 5))
+    pressure_low = nearest_5(levels["near_resistance_low"])
+    pressure_high = nearest_5(levels["near_resistance_high"])
+    core_pressure_low = nearest_5(levels["core_resistance_low"])
+    core_pressure_high = nearest_5(levels["core_resistance_high"])
+    repair_confirm = core_pressure_high
+    major_resistance = nearest_5(repair_confirm + 20)
+    far_pressure_low = nearest_5(max(levels["far_resistance_low"], major_resistance + 10))
+    far_pressure_high = nearest_5(max(levels["far_resistance_high"], far_pressure_low + 10))
+    breakdown_target = nearest_5(min(levels["lower_confirm"], rounded_low - 10, support - 10))
     extreme_target = nearest_5(breakdown_target - 20)
     return {
-        "low": nearest_5(low),
+        "low": rounded_low,
         "support": support,
         "pivot_low": pivot_low,
         "pivot_high": pivot_high,
         "close": nearest_5(close),
         "pressure_low": pressure_low,
         "pressure_high": pressure_high,
+        "core_pressure_low": core_pressure_low,
+        "core_pressure_high": core_pressure_high,
         "repair_confirm": repair_confirm,
         "major_resistance": major_resistance,
+        "far_pressure_low": far_pressure_low,
+        "far_pressure_high": far_pressure_high,
+        "near_distance_limit": levels["near_distance_limit"],
         "breakdown_target": breakdown_target,
         "extreme_target": extreme_target,
         "high": nearest_5(high),
     }
+
+
+def build_scenario_plans(plan: dict[str, float]) -> list[ScenarioPlan]:
+    return [
+        ScenarioPlan(
+            "A", "近端压力承压空", "short",
+            price_band(plan["pressure_low"], plan["pressure_high"]),
+            f"反抽到近端压力后3m转弱，不能站稳 `{fmt_price(plan['repair_confirm'])}`",
+            f"站稳 `{fmt_price(plan['repair_confirm'])}`",
+            fmt_price(plan["support"]), fmt_price(plan["breakdown_target"]), pct_range(32, 42),
+            "日内结构偏弱，近端反抽区先看承压确认", "不能在收盘低位提前追空",
+            plan["pressure_low"], plan["pressure_high"], plan["repair_confirm"], plan["support"], plan["breakdown_target"],
+        ),
+        ScenarioPlan(
+            "B", "支撑跌破回吐空", "short", f"{fmt_price(plan['support'])} 下方",
+            f"跌破 `{fmt_price(plan['support'])}` 后反抽 `{price_span(plan['pivot_low'], plan['pivot_high'])}` 不过",
+            f"重新站回 `{fmt_price(plan['pivot_high'])}`",
+            fmt_price(plan["breakdown_target"]), fmt_price(plan["extreme_target"]), pct_range(24, 32),
+            "支撑失守并反抽失败才说明弱势延续", "第一根急跌不追，防止低位假破",
+            plan["support"], plan["pivot_high"], plan["pivot_high"], plan["breakdown_target"], plan["extreme_target"],
+        ),
+        ScenarioPlan(
+            "C", "核心压力收回后的修复多", "long", f"{fmt_price(plan['repair_confirm'])} 上方",
+            f"站稳 `{fmt_price(plan['repair_confirm'])}` 并回踩 `{price_span(plan['core_pressure_low'], plan['core_pressure_high'])}` 不破",
+            f"跌回 `{fmt_price(plan['core_pressure_low'])}` 下方",
+            fmt_price(plan["major_resistance"]), price_span(plan["far_pressure_low"], plan["far_pressure_high"]), pct_range(24, 34),
+            "核心压力被收回后才具备继续修复条件", "只当修复多，不定义趋势反转",
+            plan["repair_confirm"], plan["repair_confirm"], plan["core_pressure_low"], plan["major_resistance"], plan["far_pressure_low"],
+        ),
+        ScenarioPlan(
+            "D", "低点再破延续空", "short", f"{fmt_price(plan['low'])} 下方",
+            f"跌破 `{fmt_price(plan['low'])}` 后反抽 `{price_span(plan['support'], plan['low'])}` 不过",
+            f"重新站回 `{fmt_price(plan['pivot_low'])}`",
+            fmt_price(plan["breakdown_target"]), fmt_price(plan["extreme_target"]), pct_range(16, 24),
+            "日内低点有效失守后才释放新一段下行风险", "低位连续追空风险最高",
+            min(plan["support"], plan["low"]), max(plan["support"], plan["low"]), plan["pivot_low"], plan["breakdown_target"], plan["extreme_target"],
+        ),
+        ScenarioPlan(
+            "E", "无交易区间", "observe", price_span(plan["pivot_low"], plan["pressure_low"]),
+            "没有完成边界突破/跌破确认", "出现有效边界触发",
+            "不设", "不设", "—", "空间不足、触发不清", "没有触发就观望",
+        ),
+    ]
+
+
+def scenario_probability_table(scenarios: list[ScenarioPlan]) -> str:
+    rows = []
+    for item in scenarios:
+        expected_path = "观望" if item.direction == "observe" else f"{item.target1}，再看 {item.target2}"
+        rows.append(
+            f"| {item.scenario_id}：{item.name} | {item.entry_condition} | {expected_path} | {item.probability} | {item.evidence} | {item.invalidation} |"
+        )
+    return "\n".join(rows)
+
+
+def scenario_handoff(scenarios: list[ScenarioPlan]) -> str:
+    rows = ["scenarios:"]
+    for item in scenarios:
+        rows.extend([
+            f"  - id: {item.scenario_id}",
+            f"    direction: {item.direction}",
+            f"    entry: {item.focus}",
+            f"    invalidation: {item.invalidation}",
+            f"    targets: {item.target1} / {item.target2}",
+        ])
+    return "\n".join(rows)
+
+
+def build_opening_response_table(plan: dict[str, float]) -> str:
+    lower_edge = price_span(plan["support"], plan["low"])
+    return "\n".join([
+        f"| 高开/冲高到 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` | 先看压力区是否承压，不能把高开当成直接追多信号 | 若3m冲高回落且不能站稳 `{fmt_price(plan['repair_confirm'])}`，转方案 A；若站稳 `{fmt_price(plan['repair_confirm'])}` 且回踩不破，转方案 C | 追高后被压回中轴；止损/失效看 `{fmt_price(plan['repair_confirm'])}` 是否重新站稳 |",
+        f"| 平开/围绕 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}` | 中轴内不抢方向，等价格主动靠近上沿或下沿 | 上冲到 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 看承压；跌回 `{fmt_price(plan['support'])}` 看修复失败 | 中间位空间不足，容易被来回扫 |",
+        f"| 低开/下探到 `{lower_edge}` | 不追第一根急跌，先判断是有效跌破还是假破收回 | 跌破 `{fmt_price(plan['support'])}` 且反抽不过，转方案 B；跌破 `{fmt_price(plan['low'])}` 后反抽不过，转方案 D；快速收回则回到观望/修复 | 低位假破概率高，必须等反抽不过确认 |",
+        f"| 极端跳空，直接越过 `{fmt_price(plan['repair_confirm'])}` 或跌破 `{fmt_price(plan['low'])}` | 原计划降级为观察，先让15m走出新中轴 | 等回踩/反抽确认后重新套用方案 C 或 D，不用开盘价本身直接下结论 | 跳空后盘口噪音最大，优先降低仓位或观望 |",
+    ])
+
+
+def build_operation_summary_table(scenarios: list[ScenarioPlan]) -> str:
+    direction_names = {"short": "空", "long": "多/修复", "observe": "观望"}
+    return "\n".join(
+        f"| {item.scenario_id}：{item.name} | {direction_names[item.direction]} | `{item.focus}` | {item.entry_condition} | {item.invalidation} | {item.target1} | {item.target2} | {item.risk} |"
+        for item in scenarios
+    )
 
 
 def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[Bar]], daily: list[Bar], prior_report: Path | None) -> tuple[str, dict]:
@@ -651,14 +882,24 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
     session_summary = apply_realtime_night_session_summary(kline_session_summary, quote, args.date, args.session)
     next_session = args.next_session or DEFAULT_NEXT_SESSION[args.session]
     next_date = args.next_date or (args.date + timedelta(days=1) if args.session == "night" and next_session == "next_day_day" else args.date)
-    daily = apply_realtime_night_daily(daily, quote, session_summary, args.date, args.session, next_date)
+    daily = apply_realtime_session_daily(daily, quote, session_summary, args.date, args.session, next_date)
     # Key levels must be derived from the reviewed session only.
     # Using all historical 15m bars can promote stale/far resistance into the
     # next-session near-term plan (e.g. 0629 morning wrongly lifted pressure to
     # 4475-4495 instead of the session-local 4400 area).
     levels = derive_levels(session_summary, quote, session_rows_15m)
     plan = build_plan_levels(levels)
-    bias = infer_bias(session_summary, daily)
+    scenarios = build_scenario_plans(plan)
+    scenario_by_id = {item.scenario_id: item for item in scenarios}
+    scenario_a = scenario_by_id["A"]
+    scenario_b = scenario_by_id["B"]
+    scenario_c = scenario_by_id["C"]
+    scenario_d = scenario_by_id["D"]
+    opening_response_md = build_opening_response_table(plan)
+    operation_summary_md = build_operation_summary_table(scenarios)
+    scenario_probability_md = scenario_probability_table(scenarios)
+    scenario_handoff_md = scenario_handoff(scenarios)
+    bias = infer_bias(session_summary, daily, session_rows_3m, session_rows_15m)
     source_doc = relative_report_path(args.output) if args.output else f"reports/{default_report_name(args.date, args.session)}"
     generated_at = now_cn()
     quote_stale = "是" if quote["quote_dt"].date() != args.date else "否"
@@ -695,19 +936,29 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
     if bias == "range_repair":
         core_phrase = "低位假破 + 回补修复"
         bias_sentence = "不是单边续跌，而是先下探后收回的修复结构"
-        risk_flags = "auto_generated_full_draft, false_break_low, short_covering_repair, range_trap, one_level_quote_only, no_tick_active_flow"
+        risk_flags = "automated_report, false_break_low, short_covering_repair, range_trap, one_level_quote_only, no_tick_active_flow"
     elif bias == "bearish":
         core_phrase = "弱势延续 + 反抽待确认"
         bias_sentence = "仍偏弱，反抽如果不能站稳压力位，容易重新回到弱势路径"
-        risk_flags = "auto_generated_full_draft, bearish_trend, breakdown_risk, one_level_quote_only, no_tick_active_flow"
+        risk_flags = "automated_report, bearish_trend, breakdown_risk, one_level_quote_only, no_tick_active_flow"
     elif bias == "repair":
         core_phrase = "短线修复 + 上方确认"
         bias_sentence = "短线修复更明显，但仍需上方确认位验证是否延续"
-        risk_flags = "auto_generated_full_draft, repair_confirmation_needed, range_trap, one_level_quote_only, no_tick_active_flow"
+        risk_flags = "automated_report, repair_confirmation_needed, range_trap, one_level_quote_only, no_tick_active_flow"
     else:
         core_phrase = "区间震荡 + 边界确认"
         bias_sentence = "中轴区间反复，必须等边界触发而不是在中间追单"
-        risk_flags = "auto_generated_full_draft, range_bound, range_trap, one_level_quote_only, no_tick_active_flow"
+        risk_flags = "automated_report, range_bound, range_trap, one_level_quote_only, no_tick_active_flow"
+
+    if bias == "bearish":
+        structure_summary = "早盘冲高后持续回落，收盘贴近本阶段低点，弱势路径主导"
+        low_followup = f"低点 `{fmt_price(session_summary['low'])}` 在尾段被打出且收盘未明显收回，说明修复尚未确认；低位仍不能追第一根破位"
+    elif bias in ("repair", "range_repair"):
+        structure_summary = "下探后出现收回，修复存在但仍需上方确认"
+        low_followup = f"低点 `{fmt_price(session_summary['low'])}` 打出后出现收回，低位追空逻辑降级，但修复不等于趋势反转"
+    else:
+        structure_summary = "价格围绕区间边界反复，尚未形成单边确认"
+        low_followup = f"低点 `{fmt_price(session_summary['low'])}` 与高点 `{fmt_price(session_summary['high'])}` 都需要后续确认，触碰本身不等于突破"
 
     segment_lines = [segment_sentence(label, rows, levels) for label, rows in session_segments(session_rows_3m, args.session)]
     segment_numbered = "\n".join(f"{idx}. {line}" for idx, line in enumerate(segment_lines, 1))
@@ -729,7 +980,7 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
 
     validation_rows = []
     for scenario in prior_scenarios[:4]:
-        status, reason, implication = evaluate_scenario(scenario, levels, session_summary)
+        status, reason, implication = evaluate_scenario(scenario, session_rows_3m, session_summary)
         validation_rows.append(f"| {scenario['name']} | {scenario['trigger']} | 本阶段区间 `{fmt_price(session_summary['low'])}-{fmt_price(session_summary['high'])}`，收 `{fmt_price(session_summary['close'])}` | {status} | {reason} | {implication} |")
     validation_md = "\n".join(validation_rows)
 
@@ -752,10 +1003,10 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
     markdown = f"""# PVC2609 {completed_label}复盘 + {next_label}计划
 
 > 生成时间：{generated_at.strftime('%Y-%m-%d %H:%M CST')}  
-> 生成方式：`pvc2609_generate_session_report.py` 自动生成完整草稿，需人工复核后作为正式交易文档  
+> 生成方式：`pvc2609_generate_session_report.py` 自动生成；正式发布前必须通过机器质量门禁，异常时转人工复核
 > 标的：PVC2609 期货合约  
 > 复盘对象：{completed_label}  
-> 前序计划：`{prior_report.relative_to(BASE_DIR) if prior_report else '未找到'}`  
+> 前序计划：`{relative_report_path(prior_report) if prior_report else '未找到'}`
 > 数据源：新浪期货公开 quote、3m/15m/30m/60m/120m K线、日K、本地事件监控、本地30分钟简报  
 > 数据状态：quote 返回 `{fmt_dt(quote['quote_dt'])}`，当前/收盘参考 `{fmt_price(quote['last'])}`，quote 日期与复盘日期不一致：{quote_stale}  
 > 数据限制：公开行情只有一档盘口，不能还原逐笔主动买卖；K线量仓只用于结构参考，不能直接标注多开/空开/多平/空平。  
@@ -767,12 +1018,12 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
 
 ## 2. {completed_title}总评
 
-{completed_title}从 `{fmt_price(session_summary['open'])}` 开始，最低 `{fmt_price(session_summary['low'])}`、最高 `{fmt_price(session_summary['high'])}`，最后收在 `{fmt_price(session_summary['close'])}`。结构上更接近“先验证边界，再回到中轴/压力区”的节奏，而不是单一方向的无条件延续。
+{completed_title}从 `{fmt_price(session_summary['open'])}` 开始，最低 `{fmt_price(session_summary['low'])}`、最高 `{fmt_price(session_summary['high'])}`，最后收在 `{fmt_price(session_summary['close'])}`。结构判断为：{structure_summary}。
 
 这说明：
 
 - 前序关键位 `{prior_levels_text}` 需要按“触发 + 确认”而不是“触碰即成立”来复盘。
-- 如果低点 `{fmt_price(session_summary['low'])}` 被打出后没有继续延续，则低位追空逻辑降级；如果高点 `{fmt_price(session_summary['high'])}` 附近不能继续站稳，则修复也不能直接当成趋势反转。
+- {low_followup}；如果高点 `{fmt_price(session_summary['high'])}` 附近不能继续站稳，则修复也不能直接当成趋势反转。
 - 本阶段持仓路径 `{oi_path}`，只能说明持仓增减和价格同向/背离关系，不能还原逐笔主动买卖。
 - 下一阶段不要在 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}` 中轴凭感觉来回切，应等 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 或 `{fmt_price(plan['support'])}/{fmt_price(plan['low'])}` 的边界确认。
 
@@ -861,6 +1112,14 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
 - 若站稳 `{fmt_price(plan['repair_confirm'])}`，停止死空，按修复延续或空头回补处理。
 - 下方看 `{fmt_price(plan['support'])}/{fmt_price(plan['low'])}` 是否重新失守，失守并反抽不过才重新偏弱。
 
+### 开盘应对表
+
+下面不是预测精确开盘价，而是给 {next_label} 的开盘情景处理规则。开盘后先按实际落点归类，再看3m/15m确认。
+
+| 开盘情景 | 重点观察 | 处理方案 | 风险提示 |
+|---|---|---|---|
+{opening_response_md}
+
 ## 11. {next_label_compact}关键点位
 
 | 类型 | 点位 | 含义 |
@@ -868,8 +1127,10 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
 | 本阶段收盘/中轴 | {fmt_price(plan['close'])} | 下一阶段短线强弱第一观察点 |
 | 中轴区间 | {fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])} | 中间反复不交易，等边界触发 |
 | 近端压力 | {fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])} | 承压回落或修复延续的分水岭 |
+| 核心压力 | {fmt_price(plan['core_pressure_low'])}-{fmt_price(plan['core_pressure_high'])} | 收回前仍按反抽压力，收回后空头优势降级 |
 | 修复确认 | {fmt_price(plan['repair_confirm'])} | 站稳后空单逻辑降级 |
 | 大级别修复门槛 | {fmt_price(plan['major_resistance'])} | 未站回前不把修复当反转 |
+| 远端强反抽压力 | {fmt_price(plan['far_pressure_low'])}-{fmt_price(plan['far_pressure_high'])} | 仅作远端观察，不作为第一做空参考 |
 | 近端支撑 | {fmt_price(plan['support'])} | 跌破后看修复是否失败 |
 | 本阶段低点 | {fmt_price(plan['low'])} | 再破后必须等反抽不过确认 |
 | 下方延伸 | {fmt_price(plan['breakdown_target'])} | 有效跌破后的第一目标区 |
@@ -879,15 +1140,17 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
 
 | 剧本 | 触发条件 | 预期路径 | 估计概率 | 关键证据 | 失效条件 |
 |---|---|---|---:|---|---|
-| A：{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])} 承压回落 | 反抽到压力区后3m转弱，不能站稳 `{fmt_price(plan['repair_confirm'])}` | 回看 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}`，再看 `{fmt_price(plan['support'])}` | {pct_range(32, 42)} | 大周期压力仍在，修复后第一压力区容易反复 | 站稳 `{fmt_price(plan['repair_confirm'])}` |
-| B：{fmt_price(plan['repair_confirm'])} 修复延续 | 站稳确认位，并回踩 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 不破 | 上看 `{fmt_price(plan['major_resistance'])}`，再看更高压力 | {pct_range(24, 34)} | 本阶段若已低位收回，继续修复有回补空间 | 跌回 `{fmt_price(plan['pivot_low'])}` 下方 |
-| C：跌回 `{fmt_price(plan['support'])}` 后修复失败 | 跌破支撑，反抽 `{fmt_price(plan['pivot_low'])}` 不过 | 回看 `{fmt_price(plan['low'])}`，再看 `{fmt_price(plan['breakdown_target'])}` | {pct_range(24, 32)} | 中轴失守说明修复被回吐 | 重新站回 `{fmt_price(plan['pivot_high'])}` |
-| D：`{fmt_price(plan['low'])}` 再破新低 | 跌破本阶段低点后反抽不过 | 看 `{fmt_price(plan['breakdown_target'])}`，极弱看 `{fmt_price(plan['extreme_target'])}` | {pct_range(16, 24)} | 低点失守会重新释放下行风险 | 跌破后快速收回 `{fmt_price(plan['support'])}` |
-| E：无交易区间 | 价格在 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pressure_low'])}` 内反复 | 观望 | — | 空间不足、触发不清 | 突破或跌破边界并确认 |
+{scenario_probability_md}
 
 概率只用于比较剧本优先级，不是统计承诺。若价格一直在中轴内反复，没有必要为了交易而交易。
 
-## 13. {next_label_compact}方案 A：{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])} 承压后的空
+### 统一操作方案速查表
+
+| 方案 | 方向 | 关注位置 | 入场条件 | 止损/失效 | 第一止盈 | 第二止盈 | 风险提示 |
+|---|---|---|---|---|---|---|---|
+{operation_summary_md}
+
+## 13. {next_label_compact}方案 A：{scenario_a.name}
 
 适用场景：价格反抽 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}`，但不能站稳，3m 出现冲高回落，15m 没有继续抬高。
 
@@ -897,15 +1160,15 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
 | 入场区 | `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 承压后，3m 转弱再考虑 |
 | 仓位 | 1 手基础；只有跌回中轴且反抽不过时再考虑加到 2 手 |
 | 止损 | `{fmt_price(plan['repair_confirm'])}` 上方；若站稳确认位，空单逻辑降级 |
-| 第一止盈 | `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}` |
-| 第二止盈 | `{fmt_price(plan['support'])}` |
-| 估计概率 | {pct_range(32, 42)} |
+| 第一止盈 | `{scenario_a.target1}` |
+| 第二止盈 | `{scenario_a.target2}` |
+| 估计概率 | {scenario_a.probability} |
 | 依据 | 大周期压力未解除，压力区承压仍是顺背景交易 |
 | 主要风险 | 若确认位被收回，继续空容易被修复延续挤压 |
 
 执行要点：不要在 `{fmt_price(plan['close'])}` 附近直接开空；必须等压力区承压和3m转弱。若价格没有到压力区或没有转弱，本方案不成立。
 
-## 14. {next_label_compact}方案 B：跌回 `{fmt_price(plan['support'])}` 后的弱势回吐
+## 14. {next_label_compact}方案 B：{scenario_b.name}
 
 适用场景：价格跌回 `{fmt_price(plan['support'])}` 下方，且反抽 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}` 不能重新站回。
 
@@ -915,33 +1178,33 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
 | 入场区 | 跌回 `{fmt_price(plan['support'])}` 后，反抽中轴不过再考虑 |
 | 仓位 | 1 手；不追第一根急跌 |
 | 止损 | `{fmt_price(plan['pivot_high'])}-{fmt_price(plan['pressure_low'])}`；重新站回中轴后逻辑降级 |
-| 第一止盈 | `{fmt_price(plan['low'])}` |
-| 第二止盈 | `{fmt_price(plan['breakdown_target'])}` |
-| 估计概率 | {pct_range(24, 32)} |
+| 第一止盈 | `{scenario_b.target1}` |
+| 第二止盈 | `{scenario_b.target2}` |
+| 估计概率 | {scenario_b.probability} |
 | 依据 | 中轴/支撑失守说明本阶段修复被否定 |
 | 主要风险 | 低位已经验证过容易出现假破，必须等反抽不过 |
 
 执行要点：这不是追空方案，而是“修复失败确认”方案。只有跌回支撑且反抽不过，才说明本阶段修复被否定。
 
-## 15. {next_label_compact}方案 C：站稳 `{fmt_price(plan['repair_confirm'])}` 的修复延续
+## 15. {next_label_compact}方案 C：{scenario_c.name}
 
-适用场景：价格站稳 `{fmt_price(plan['repair_confirm'])}`，并且回踩 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 不破，15m 低点继续抬高。
+适用场景：价格站稳 `{fmt_price(plan['repair_confirm'])}`，并且回踩 `{fmt_price(plan['core_pressure_low'])}-{fmt_price(plan['core_pressure_high'])}` 不破，15m 低点继续抬高。
 
 | 项目 | 计划 |
 |---|---|
 | 方向 | 修复多 / 空头回补延续 |
-| 入场区 | `{fmt_price(plan['repair_confirm'])}` 站稳回踩不破，或压力区被收回后再确认 |
+| 入场区 | `{fmt_price(plan['repair_confirm'])}` 站稳回踩核心压力区不破后再确认 |
 | 仓位 | 1 手；趋势未反转前不加大仓位 |
-| 止损 | 跌回 `{fmt_price(plan['pressure_low'])}` 下方，或重新失守中轴 |
-| 第一止盈 | `{fmt_price(plan['major_resistance'])}` |
-| 第二止盈 | `{fmt_price(plan['major_resistance'] + 20)}` 附近 |
-| 估计概率 | {pct_range(24, 34)} |
+| 止损 | 跌回 `{fmt_price(plan['core_pressure_low'])}` 下方，或重新失守中轴 |
+| 第一止盈 | `{scenario_c.target1}` |
+| 第二止盈 | `{scenario_c.target2}` 远端压力区 |
+| 估计概率 | {scenario_c.probability} |
 | 依据 | 若确认位继续收回，说明回补/修复还有延续空间 |
 | 主要风险 | 大周期压力仍在，不能把修复多当趋势反转 |
 
 执行要点：多单只做修复，不定义趋势反转。到 `{fmt_price(plan['major_resistance'])}` 必须保护利润；只有继续站稳后，才看更高一档。
 
-## 16. {next_label_compact}方案 D：`{fmt_price(plan['low'])}` 再次跌破后的新低延续
+## 16. {next_label_compact}方案 D：{scenario_d.name}
 
 适用场景：价格重新跌破本阶段低点 `{fmt_price(plan['low'])}`，且反抽 `{fmt_price(plan['low'])}-{fmt_price(plan['support'])}` 不能收回。
 
@@ -951,9 +1214,9 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
 | 入场区 | 跌破 `{fmt_price(plan['low'])}` 后，反抽 `{fmt_price(plan['low'])}-{fmt_price(plan['support'])}` 不过再考虑 |
 | 仓位 | 1 手；不建议第一根破位重仓追 |
 | 止损 | 重新站回 `{fmt_price(plan['support'])}` 或 `{fmt_price(plan['pivot_low'])}` |
-| 第一止盈 | `{fmt_price(plan['breakdown_target'])}` |
-| 第二止盈 | `{fmt_price(plan['extreme_target'])}` |
-| 估计概率 | {pct_range(16, 24)} |
+| 第一止盈 | `{scenario_d.target1}` |
+| 第二止盈 | `{scenario_d.target2}` |
+| 估计概率 | {scenario_d.probability} |
 | 依据 | 本阶段低点若被有效跌破，说明修复失败并重新释放下行风险 |
 | 主要风险 | 连续下探后低位假破概率高，必须等反抽不过确认 |
 
@@ -963,10 +1226,10 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
 
 | 优先级 | 方案 | 触发条件 | 评价 |
 |---:|---|---|---|
-| 1 | 方案 A：压力区承压空 | 到 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}` 后3m转弱 | 顺大背景，但必须防止修复延续 |
-| 2 | 方案 C：确认位修复延续 | 站稳 `{fmt_price(plan['repair_confirm'])}` | 适合处理低位收回后的继续回补 |
-| 3 | 方案 B：支撑跌回后的回吐空 | 跌回 `{fmt_price(plan['support'])}` 且反抽不过 | 用于确认本阶段修复失败 |
-| 4 | 方案 D：低点再破新低 | 跌破后反抽不过 `{fmt_price(plan['low'])}-{fmt_price(plan['support'])}` | 有效但低位追空风险最高 |
+| 1 | 方案 A：{scenario_a.name} | {scenario_a.entry_condition} | 顺大背景，但必须防止修复延续 |
+| 2 | 方案 C：{scenario_c.name} | {scenario_c.entry_condition} | 适合处理低位收回后的继续回补 |
+| 3 | 方案 B：{scenario_b.name} | {scenario_b.entry_condition} | 用于确认本阶段修复失败 |
+| 4 | 方案 D：{scenario_d.name} | {scenario_d.entry_condition} | 有效但低位追空风险最高 |
 
 {next_label}最不应该做的是在 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}` 中间位置凭感觉来回切。这个区间是当前中轴，必须等价格去触碰边界：上方 `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['repair_confirm'])}` 或下方 `{fmt_price(plan['support'])}/{fmt_price(plan['low'])}`。
 
@@ -998,7 +1261,7 @@ PVC 期货每手 5 吨，价格每波动 1 点约 5 元/手。下面不是收益
 
 按三句话执行：
 
-- `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])} 承压转弱`：可以考虑反抽空，先看 `{fmt_price(plan['pivot_low'])}-{fmt_price(plan['pivot_high'])}`，再看 `{fmt_price(plan['support'])}`。
+- `{fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])} 承压转弱`：可以考虑反抽空，先看 `{fmt_price(plan['support'])}`，再看 `{fmt_price(plan['breakdown_target'])}`。
 - `{fmt_price(plan['repair_confirm'])} 站稳`：停止死空，按修复延续处理，先看 `{fmt_price(plan['major_resistance'])}`。
 - `{fmt_price(plan['low'])} 再破且反抽不过`：才看新低延续；如果跌破后又快速收回，继续按假破处理。
 
@@ -1027,8 +1290,16 @@ must_watch_levels:
     trigger: hold_or_reject
   - price: {fmt_price(plan['pressure_low'])}-{fmt_price(plan['pressure_high'])}
     role: resistance
-    label: 压力区/承压观察
+    label: 近端压力区/承压观察
     trigger: rejection_or_break_up
+  - price: {fmt_price(plan['core_pressure_low'])}-{fmt_price(plan['core_pressure_high'])}
+    role: core_resistance
+    label: 核心反抽压力
+    trigger: rejection_or_reclaim
+  - price: {fmt_price(plan['far_pressure_low'])}-{fmt_price(plan['far_pressure_high'])}
+    role: far_resistance
+    label: 远端强反抽压力/非第一做空参考
+    trigger: far_reclaim_or_fail
   - price: {fmt_price(plan['repair_confirm'])}
     role: repair_confirmation
     label: 修复延续确认位
@@ -1040,23 +1311,39 @@ must_watch_levels:
 invalidated_levels:
   - price: {prior_mentions[0] if prior_mentions else 'TBD'}
     reason: 若已被本阶段刺破/收回，单独作为触发信号权重下降，需结合确认链使用
+{scenario_handoff_md}
 monitor_levels_updated: {str(args.update_levels).lower()}
 ```
 """
+
+    monitor_levels = [
+        {"price": round(plan["low"]), "role": "support", "label": "本阶段低点/再破确认位", "direction": "down"},
+        {"price": round(plan["support"]), "role": "weakness_confirmation", "label": "近端支撑/修复失败观察", "direction": "both"},
+        {"price": round(plan["pressure_low"]), "role": "resistance", "label": "压力区下沿/承压观察", "direction": "both"},
+        {"price": round(plan["core_pressure_low"]), "role": "core_resistance", "label": "核心反抽压力区下沿", "direction": "both"},
+        {"price": round(plan["repair_confirm"]), "role": "repair_confirmation", "label": "修复延续确认位", "direction": "up"},
+        {"price": round(plan["major_resistance"]), "role": "major_resistance", "label": "大级别修复门槛", "direction": "up"},
+        {"price": round(plan["far_pressure_low"]), "role": "far_resistance", "label": "远端强反抽压力下沿", "direction": "up"},
+    ]
+    if round(plan["pivot_low"]) not in {item["price"] for item in monitor_levels}:
+        monitor_levels.insert(2, {"price": round(plan["pivot_low"]), "role": "midline_low", "label": "短线中轴下沿", "direction": "both"})
 
     prediction_payload = {
         "contract": CONTRACT,
         "source_doc": source_doc,
         "updated_at": generated_at.isoformat(),
         "session": next_session,
-        "levels": [
-            {"price": round(plan["low"]), "role": "support", "label": "本阶段低点/再破确认位", "direction": "down"},
-            {"price": round(plan["support"]), "role": "weakness_confirmation", "label": "近端支撑/修复失败观察", "direction": "both"},
-            {"price": round(plan["pivot_low"]), "role": "midline_low", "label": "短线中轴下沿", "direction": "both"},
-            {"price": round(plan["pressure_low"]), "role": "resistance", "label": "压力区下沿/承压观察", "direction": "both"},
-            {"price": round(plan["repair_confirm"]), "role": "repair_confirmation", "label": "修复延续确认位", "direction": "up"},
-            {"price": round(plan["major_resistance"]), "role": "major_resistance", "label": "大级别修复门槛", "direction": "up"},
-        ],
+        "levels": monitor_levels,
+        "_quality": {
+            "review_date": args.date.isoformat(),
+            "quote_dt": quote["quote_dt"].isoformat(),
+            "daily_date": daily[-1].dt.date().isoformat() if daily and daily[-1].dt else None,
+            "prior_report": relative_report_path(prior_report) if prior_report else None,
+            "bias": bias,
+            "session": {key: session_summary[key] for key in ("open", "high", "low", "close")},
+            "plan": plan,
+            "scenarios": [item.__dict__ for item in scenarios],
+        },
     }
     return markdown, prediction_payload
 
@@ -1092,6 +1379,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def runtime_prediction_payload(payload: dict) -> dict:
+    """Return the monitor-compatible payload without report-only diagnostics."""
+    return {key: value for key, value in payload.items() if key != "_quality"}
+
+
 def main() -> int:
     args = parse_args()
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -1110,7 +1402,7 @@ def main() -> int:
     output.write_text(markdown, encoding="utf-8")
     if args.update_levels:
         RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
-        PREDICTION_LEVELS_PATH.write_text(json.dumps(prediction_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        PREDICTION_LEVELS_PATH.write_text(json.dumps(runtime_prediction_payload(prediction_payload), ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(str(output))
     if args.update_levels:

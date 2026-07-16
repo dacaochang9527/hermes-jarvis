@@ -76,3 +76,7 @@ hermes-agent/.git.embedded-backup/
 
 # --- OS ---
 .DS_Store
+
+.playwright-mcp/
+
+cron/jobs.json
