@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>A股超跌反转 · 日K看板</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">REVERSAL BREAKOUT</p>
+      <h1>A股超跌反转日K看板</h1>
+      <p id="reportMeta" class="muted">正在读取最新筛选报告…</p>
+    </div>
+    <div class="legend" aria-label="均线图例">
+      <span><i class="legend-ma5"></i>MA5</span>
+      <span><i class="legend-ma10"></i>MA10</span>
+      <span><i class="legend-ma20"></i>MA20</span>
+      <span><i class="legend-ma60"></i>MA60</span>
+      <span><i class="legend-ma120"></i>MA120</span>
+      <span class="legend-note">红涨 · 青跌</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="summary" id="summary"></section>
+
+    <section class="toolbar" aria-label="筛选工具栏">
+      <div id="stageTabs" class="stage-tabs" role="tablist"></div>
+      <div class="filters">
+        <label>
+          <span>快速方案</span>
+          <select id="presetSelect">
+            <option value="focus">二次精选</option>
+            <option value="technical">技术精选</option>
+            <option value="manual">手动筛选</option>
+          </select>
+        </label>
+        <label class="search">
+          <span>搜索</span>
+          <input id="searchInput" type="search" placeholder="代码或名称" autocomplete="off">
+        </label>
+        <label>
+          <span>排序</span>
+          <select id="sortSelect">
+            <option value="secondary_score">二次评分</option>
+            <option value="score">综合分</option>
+            <option value="pct_chg">当日涨幅</option>
+            <option value="rsi6">RSI6</option>
+            <option value="breakout_ratio">突破比</option>
+            <option value="distance_ma20_pct">MA20乖离</option>
+            <option value="volume_ratio">量能倍数</option>
+            <option value="turnover">换手率</option>
+            <option value="float_cap_yi">流通市值</option>
+            <option value="max_drawdown_pct">历史回撤</option>
+            <option value="industry_rank_pct">行业强度</option>
+            <option value="rs20_benchmark_pct">RS20</option>
+            <option value="ma60_slope_10d_pct">MA60斜率</option>
+            <option value="breakout_60d_ratio">60日突破</option>
+            <option value="code">股票代码</option>
+          </select>
+        </label>
+        <label class="check">
+          <input id="elasticOnly" type="checkbox">
+          <span>仅高弹性</span>
+        </label>
+      </div>
+    </section>
+
+    <details class="advanced-filters" open>
+      <summary>
+        <span>指标组合筛选</span>
+        <span id="activeFilterCount" class="active-filter-count">0项已启用</span>
+      </summary>
+      <div class="indicator-grid">
+        <label>
+          <span>Heat 热度</span>
+          <select id="heatFilter">
+            <option value="all">全部</option>
+            <option value="正常">正常</option>
+            <option value="偏热">偏热</option>
+            <option value="过热">过热</option>
+          </select>
+        </label>
+        <label>
+          <span>Trend 趋势</span>
+          <select id="trendFilter">
+            <option value="all">全部</option>
+            <option value="完整多头">完整多头</option>
+            <option value="早期过渡">早期过渡</option>
+          </select>
+        </label>
+        <label>
+          <span>Style 市值风格</span>
+          <select id="styleFilter">
+            <option value="all">全部</option>
+            <option value="小盘">小盘</option>
+            <option value="中盘">中盘</option>
+            <option value="大盘">大盘</option>
+            <option value="超大盘">超大盘</option>
+          </select>
+        </label>
+        <label>
+          <span>涨停状态</span>
+          <select id="limitFilter">
+            <option value="all">全部</option>
+            <option value="yes">仅涨停</option>
+            <option value="no">排除涨停</option>
+          </select>
+        </label>
+        <label>
+          <span>风险状态</span>
+          <select id="riskFilter">
+            <option value="all">全部</option>
+            <option value="clean">无主要风险提示</option>
+            <option value="flagged">有风险提示</option>
+          </select>
+        </label>
+        <label>
+          <span>最低综合分</span>
+          <input id="minScoreFilter" type="number" min="0" max="100" step="1" placeholder="不限">
+        </label>
+        <label>
+          <span>RSI6 上限</span>
+          <input id="maxRsiFilter" type="number" min="0" max="100" step="0.1" placeholder="不限">
+        </label>
+        <label>
+          <span>MA20乖离上限 %</span>
+          <input id="maxDistanceFilter" type="number" step="0.1" placeholder="不限">
+        </label>
+        <label>
+          <span>突破比下限</span>
+          <input id="minBreakoutFilter" type="number" min="0" step="0.001" placeholder="不限">
+        </label>
+        <label>
+          <span>量能倍数下限</span>
+          <input id="minVolumeFilter" type="number" min="0" step="0.1" placeholder="不限">
+        </label>
+        <label>
+          <span>二次层级</span>
+          <select id="focusFilter">
+            <option value="all">全部</option>
+            <option value="核心观察">核心观察</option>
+            <option value="重点复核">重点复核</option>
+            <option value="一般观察">一般观察</option>
+          </select>
+        </label>
+        <label>
+          <span>行业</span>
+          <select id="industryFilter">
+            <option value="all">全部行业</option>
+          </select>
+        </label>
+        <label>
+          <span>长周期结构</span>
+          <select id="longTrendFilter">
+            <option value="all">全部</option>
+            <option value="长短共振">长短共振</option>
+            <option value="MA60转强">MA60转强</option>
+            <option value="长期修复">长期修复</option>
+            <option value="长压未解">长压未解</option>
+          </select>
+        </label>
+        <label>
+          <span>量价结构</span>
+          <select id="volumeStructureFilter">
+            <option value="all">全部</option>
+            <option value="缩量后放量">缩量后放量</option>
+            <option value="温和放量">温和放量</option>
+            <option value="量价一般">量价一般</option>
+            <option value="量价分歧">量价分歧</option>
+          </select>
+        </label>
+        <label>
+          <span>基本面状态</span>
+          <select id="fundamentalFilter">
+            <option value="all">全部</option>
+            <option value="usable">无硬伤</option>
+            <option value="正常">仅正常</option>
+            <option value="关注">关注</option>
+            <option value="风险">有硬伤</option>
+            <option value="数据缺失">数据缺失</option>
+          </select>
+        </label>
+        <label>
+          <span>公告风险</span>
+          <select id="announcementFilter">
+            <option value="all">全部</option>
+            <option value="clean">无风险关键词</option>
+            <option value="flagged">有风险关键词</option>
+            <option value="missing">数据缺失</option>
+          </select>
+        </label>
+        <label>
+          <span>二次评分下限</span>
+          <input id="minSecondaryFilter" type="number" min="0" max="100" step="1" placeholder="不限">
+        </label>
+        <label>
+          <span>行业强度下限 %</span>
+          <input id="minIndustryRankFilter" type="number" min="0" max="100" step="1" placeholder="不限">
+        </label>
+        <label>
+          <span>RS20下限 %</span>
+          <input id="minRs20Filter" type="number" step="0.1" placeholder="不限">
+        </label>
+        <label>
+          <span>超行业下限 %</span>
+          <input id="minStockIndustryFilter" type="number" step="0.1" placeholder="不限">
+        </label>
+        <label>
+          <span>60日突破下限</span>
+          <input id="minBreakout60Filter" type="number" min="0" step="0.001" placeholder="不限">
+        </label>
+        <label>
+          <span>MA60斜率下限 %</span>
+          <input id="minMa60SlopeFilter" type="number" step="0.1" placeholder="不限">
+        </label>
+      </div>
+      <p class="preset-help">技术精选：85分、正常热度、RSI≤75、MA20乖离≤10%、20日突破≥0.98、量能≥1.2；二次精选继续叠加行业相对强度、长周期和风险否决。</p>
+      <div class="filter-actions">
+        <span id="filterSummary" class="muted">未启用指标筛选</span>
+        <button id="resetFilters" class="reset-button" type="button">重置全部筛选</button>
+      </div>
+    </details>
+
+    <section class="result-line">
+      <span id="visibleCount">0只</span>
+      <span class="muted">移动到日柱可查看当日数据；点击图表进入缩放视图</span>
+    </section>
+
+    <section id="stockGrid" class="stock-grid" aria-live="polite"></section>
+    <div id="emptyState" class="empty-state" hidden>当前条件下没有股票。</div>
+  </main>
+
+  <dialog id="chartDialog" class="chart-dialog">
+    <div class="dialog-head">
+      <div>
+        <p id="dialogCode" class="eyebrow"></p>
+        <h2 id="dialogTitle"></h2>
+      </div>
+      <button id="dialogClose" class="icon-button" type="button" aria-label="关闭">×</button>
+    </div>
+    <div id="dialogMetrics" class="dialog-metrics"></div>
+    <div class="large-chart-wrap">
+      <canvas id="largeChart" tabindex="0" aria-label="交互式日K图"></canvas>
+      <div id="largeTooltip" class="chart-tooltip"></div>
+    </div>
+    <p class="dialog-help">鼠标移动查看日柱 · 滚轮缩放 · 按住拖动平移 · 双击恢复</p>
+  </dialog>
+
+  <template id="stockCardTemplate">
+    <article class="stock-card">
+      <header class="card-head">
+        <div>
+          <div class="stock-title"><strong class="stock-name"></strong><span class="stock-code"></span></div>
+          <div class="stock-tags"></div>
+        </div>
+        <div class="score-badge"></div>
+      </header>
+      <div class="quote-row">
+        <strong class="last-price"></strong>
+        <span class="pct-change"></span>
+        <span class="trade-date"></span>
+      </div>
+      <div class="mini-chart-wrap" role="button" tabindex="0" aria-label="打开交互式日K大图">
+        <canvas class="mini-chart"></canvas>
+        <div class="chart-status">日K加载中…</div>
+        <div class="chart-tooltip"></div>
+      </div>
+      <div class="card-metrics"></div>
+      <details>
+        <summary>入选依据与风险</summary>
+        <p class="reasons"></p>
+        <p class="secondary-evidence"></p>
+        <p class="fundamental-notes"></p>
+        <p class="announcement-notes"></p>
+        <p class="risks"></p>
+      </details>
+    </article>
+  </template>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>
