@@ -10,6 +10,7 @@ Config (``~/.hermes/config.yaml``)::
       runtime_footer:
         enabled: true                       # off by default
         fields: [model, context_pct, cwd]   # order shown; drop any to hide
+        style: plain                        # plain | compact | subtle
 
 Per-platform overrides live under ``display.platforms.<platform>.runtime_footer``.
 Users can toggle the global setting with ``/footer on|off`` from both the CLI
@@ -31,6 +32,7 @@ from typing import Any, Iterable, Optional
 
 _DEFAULT_FIELDS: tuple[str, ...] = ("model", "context_pct", "cwd")
 _SEP = " · "
+_DEFAULT_STYLE = "plain"
 
 
 def _home_relative_cwd(cwd: str) -> str:
@@ -65,7 +67,11 @@ def resolve_footer_config(
         2. ``display.runtime_footer``
         3. ``display.platforms.<platform_key>.runtime_footer``
     """
-    resolved = {"enabled": False, "fields": list(_DEFAULT_FIELDS)}
+    resolved = {
+        "enabled": False,
+        "fields": list(_DEFAULT_FIELDS),
+        "style": _DEFAULT_STYLE,
+    }
     cfg = (user_config or {}).get("display") or {}
 
     global_cfg = cfg.get("runtime_footer")
@@ -74,6 +80,8 @@ def resolve_footer_config(
             resolved["enabled"] = bool(global_cfg.get("enabled"))
         if isinstance(global_cfg.get("fields"), list) and global_cfg["fields"]:
             resolved["fields"] = [str(f) for f in global_cfg["fields"]]
+        if "style" in global_cfg:
+            resolved["style"] = str(global_cfg.get("style") or _DEFAULT_STYLE)
 
     if platform_key:
         platforms = cfg.get("platforms") or {}
@@ -85,6 +93,8 @@ def resolve_footer_config(
                     resolved["enabled"] = bool(plat_footer.get("enabled"))
                 if isinstance(plat_footer.get("fields"), list) and plat_footer["fields"]:
                     resolved["fields"] = [str(f) for f in plat_footer["fields"]]
+                if "style" in plat_footer:
+                    resolved["style"] = str(plat_footer.get("style") or _DEFAULT_STYLE)
 
     return resolved
 
@@ -96,6 +106,8 @@ def format_runtime_footer(
     context_length: Optional[int],
     cwd: Optional[str] = None,
     fields: Iterable[str] = _DEFAULT_FIELDS,
+    style: str = _DEFAULT_STYLE,
+    platform_key: str | None = None,
 ) -> str:
     """Render the footer line, or return "" if no fields have data.
 
@@ -120,7 +132,15 @@ def format_runtime_footer(
 
     if not parts:
         return ""
-    return _SEP.join(parts)
+    rendered = _SEP.join(parts)
+    if style == "compact":
+        return f"✦ {rendered}"
+    if style == "subtle":
+        subtle = f"✦ {rendered}"
+        if platform_key == "feishu":
+            return f"*<font color='grey'>{subtle}</font>*"
+        return f"*{subtle}*"
+    return rendered
 
 
 def build_footer_line(
@@ -147,4 +167,6 @@ def build_footer_line(
         context_length=context_length,
         cwd=cwd,
         fields=cfg.get("fields") or _DEFAULT_FIELDS,
+        style=str(cfg.get("style") or _DEFAULT_STYLE),
+        platform_key=platform_key,
     )

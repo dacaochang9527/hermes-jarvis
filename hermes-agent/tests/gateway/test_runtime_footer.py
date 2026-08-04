@@ -147,13 +147,55 @@ def test_format_footer_unknown_field_silently_ignored():
     assert out == "gpt-5.4 · 50%"
 
 
+def test_format_footer_compact_style_prefixes_metadata_marker():
+    out = format_runtime_footer(
+        model="openai/gpt-5.4",
+        context_tokens=0,
+        context_length=None,
+        cwd="",
+        fields=("model",),
+        style="compact",
+    )
+    assert out == "✦ gpt-5.4"
+
+
+def test_format_footer_subtle_style_uses_feishu_muted_italic_markup():
+    out = format_runtime_footer(
+        model="openai/gpt-5.4",
+        context_tokens=0,
+        context_length=None,
+        cwd="",
+        fields=("model",),
+        style="subtle",
+        platform_key="feishu",
+    )
+    assert out == "*<font color='grey'>✦ gpt-5.4</font>*"
+
+
+def test_format_footer_subtle_style_uses_portable_italic_elsewhere():
+    out = format_runtime_footer(
+        model="openai/gpt-5.4",
+        context_tokens=0,
+        context_length=None,
+        cwd="",
+        fields=("model",),
+        style="subtle",
+        platform_key="weixin",
+    )
+    assert out == "*✦ gpt-5.4*"
+
+
 # ---------------------------------------------------------------------------
 # resolve_footer_config
 # ---------------------------------------------------------------------------
 
 def test_resolve_defaults_off_empty_config():
     cfg = resolve_footer_config({}, "telegram")
-    assert cfg == {"enabled": False, "fields": ["model", "context_pct", "cwd"]}
+    assert cfg == {
+        "enabled": False,
+        "fields": ["model", "context_pct", "cwd"],
+        "style": "plain",
+    }
 
 
 def test_resolve_global_enable():
@@ -195,6 +237,19 @@ def test_resolve_platform_can_add_fields_only():
     assert dc["fields"] == ["context_pct"]
 
 
+def test_resolve_platform_style_override_wins():
+    user = {
+        "display": {
+            "runtime_footer": {"style": "plain"},
+            "platforms": {
+                "feishu": {"runtime_footer": {"style": "compact"}},
+            },
+        },
+    }
+    assert resolve_footer_config(user, "telegram")["style"] == "plain"
+    assert resolve_footer_config(user, "feishu")["style"] == "compact"
+
+
 def test_resolve_ignores_malformed_config():
     # Non-dict runtime_footer shouldn't crash
     user = {"display": {"runtime_footer": "on"}}
@@ -229,6 +284,56 @@ def test_build_footer_returns_rendered_when_enabled(monkeypatch, tmp_path):
     (tmp_path / "proj").mkdir(exist_ok=True)
     assert "gpt-5.4" in out
     assert "25%" in out
+
+
+def test_build_footer_applies_per_platform_compact_style():
+    user = {
+        "display": {
+            "platforms": {
+                "weixin": {
+                    "runtime_footer": {
+                        "enabled": True,
+                        "fields": ["model"],
+                        "style": "compact",
+                    },
+                },
+            },
+        },
+    }
+    out = build_footer_line(
+        user_config=user,
+        platform_key="weixin",
+        model="openai/gpt-5.4",
+        context_tokens=0,
+        context_length=None,
+        cwd="",
+    )
+    assert out == "✦ gpt-5.4"
+
+
+def test_build_footer_applies_feishu_subtle_style():
+    user = {
+        "display": {
+            "platforms": {
+                "feishu": {
+                    "runtime_footer": {
+                        "enabled": True,
+                        "fields": ["model"],
+                        "style": "subtle",
+                    },
+                },
+            },
+        },
+    }
+    out = build_footer_line(
+        user_config=user,
+        platform_key="feishu",
+        model="openai/gpt-5.4",
+        context_tokens=0,
+        context_length=None,
+        cwd="",
+    )
+    assert out == "*<font color='grey'>✦ gpt-5.4</font>*"
 
 
 def test_build_footer_per_platform_off_suppresses():

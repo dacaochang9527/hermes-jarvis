@@ -10847,6 +10847,8 @@ class GatewayRunner:
                 context_tokens=0,
                 context_length=None,
                 fields=effective.get("fields") or ["model", "context_pct", "cwd"],
+                style=str(effective.get("style") or "plain"),
+                platform_key=platform_key,
             )
             if preview:
                 example = t("gateway.footer.example_line", preview=preview)
