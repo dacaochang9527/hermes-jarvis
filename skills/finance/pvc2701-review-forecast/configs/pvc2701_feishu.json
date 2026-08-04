@@ -1,0 +1,16 @@
+{
+  "contract": "PVC2701",
+  "sina_symbol": "V2701",
+  "quote_symbol": "nf_V2701",
+  "report_group": {
+    "name": "pvc2701",
+    "chat_id": "oc_d5aa041b453e9b6f8a38fba75fa94b37",
+    "deliver": "feishu:oc_d5aa041b453e9b6f8a38fba75fa94b37"
+  },
+  "schedules": {
+    "afternoon": "40 11 * * 1-5",
+    "night": "10 15 * * 1-5",
+    "morning": "10 23 * * 1-5"
+  }
+}
+
