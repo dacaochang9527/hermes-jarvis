@@ -358,10 +358,19 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_target_date(target: str, explicit_date: date | None = None, current: datetime | None = None) -> date:
+    if explicit_date is not None:
+        return explicit_date
+    current = current or now_cn()
+    spec = preopen.TARGETS.get(target)
+    return preopen.default_target_date(spec, current=current) if spec else current.date()
+
+
 def main() -> int:
     args = parse_args()
-    target_date = args.date or now_cn().date()
+    current = now_cn()
     target = select_target() if args.target == "auto" else args.target
+    target_date = resolve_target_date(target, args.date, current)
     if target == "skip":
         append_log({
             "ts": now_cn().isoformat(),
@@ -385,7 +394,11 @@ def main() -> int:
         run_check("飞书token/Markdown转换", check_feishu_token_and_convert),
     ]
     for item in targets:
-        results.append(run_check(f"{TARGET_LABELS[item]}报告dry-run", lambda item=item: preopen_dry_run(item, target_date)))
+        item_target_date = resolve_target_date(item, args.date, current)
+        results.append(run_check(
+            f"{TARGET_LABELS[item]}报告dry-run",
+            lambda item=item, item_target_date=item_target_date: preopen_dry_run(item, item_target_date),
+        ))
     results.append(run_check("盘中关键位dry-run", lambda: check_intraday_dry_run(target_date)))
 
     failures = [result for result in results if not result.ok]

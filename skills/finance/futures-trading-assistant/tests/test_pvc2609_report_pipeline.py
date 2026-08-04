@@ -14,6 +14,7 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SKILL_DIR))
 
 import pvc2609_generate_session_report as generator
+import pvc2609_automation_healthcheck as healthcheck
 import pvc2609_preopen_review_publish as publisher
 import publish_feishu_markdown_doc as feishu_publisher
 
@@ -89,6 +90,62 @@ class GeneratorRegressionTests(unittest.TestCase):
         summary = generator.summarize_bars(self.rows3)
         statuses = [generator.evaluate_scenario(item, self.rows3, summary)[0] for item in scenarios]
         self.assertEqual(statuses, ["触发且确认", "未触发", "触发且确认", "触发且确认"])
+
+    def test_historical_backfill_uses_completed_session_close(self) -> None:
+        later_quote = {
+            **self.quote,
+            "open": 4600,
+            "high": 4700,
+            "low": 4400,
+            "last": 4650,
+            "quote_dt": datetime.fromisoformat("2026-07-13T23:00:00+08:00"),
+        }
+        selected = generator.select_review_quote(later_quote, self.rows3, date(2026, 7, 13), "day")
+        summary = generator.summarize_bars(self.rows3)
+        self.assertEqual(selected["data_mode"], "historical_session_close")
+        self.assertEqual(selected["last"], summary["close"])
+        self.assertEqual(selected["high"], summary["high"])
+        self.assertEqual(selected["quote_dt"], self.rows3[-1].dt)
+
+    def test_night_live_quote_is_authoritative_for_ohlc(self) -> None:
+        night_rows = [
+            generator.Bar(generator.parse_dt("2026-07-23 21:03:00"), 4642, 4642, 4627, 4636, 460, 1003703),
+            generator.Bar(generator.parse_dt("2026-07-23 23:00:00"), 4614, 4615, 4613, 4614, 712, 1010034),
+        ]
+        live_quote = {
+            "name": "PVC2609", "open": 4650, "high": 4650, "low": 4603, "last": 4614,
+            "bid": 4613, "ask": 4614, "open_interest": 1010034, "volume": 337463,
+            "quote_dt": datetime.fromisoformat("2026-07-23T23:00:00+08:00"), "raw": [],
+        }
+        selected = generator.select_review_quote(live_quote, night_rows, date(2026, 7, 23), "night")
+        self.assertEqual(selected["data_mode"], "live_quote_primary")
+        self.assertEqual((selected["open"], selected["high"], selected["low"], selected["last"]), (4650, 4650, 4603, 4614))
+        self.assertEqual(selected["ohlc_discrepancy"], {"open": 8, "high": 8, "low": -10, "close": 0})
+
+    def test_day_live_quote_does_not_replace_session_local_high_low(self) -> None:
+        selected = generator.select_review_quote(self.quote, self.rows3, date(2026, 7, 13), "day")
+        summary = generator.summarize_bars(self.rows3)
+        self.assertEqual(selected["data_mode"], "live_quote_close_kline_ohlc")
+        self.assertEqual(selected["high"], summary["high"])
+        self.assertEqual(selected["low"], summary["low"])
+
+    def test_historical_day_report_filters_future_daily_rows(self) -> None:
+        future = generator.Bar(generator.parse_dt("2026-07-14"), 4600, 4700, 4500, 4650, 1, 1)
+        rows = generator.daily_rows_for_review([*self.daily, future], date(2026, 7, 13), "day")
+        selected = generator.select_review_quote(self.quote, self.rows3, date(2026, 7, 13), "day", True)
+        rows = generator.apply_realtime_session_daily(
+            rows,
+            selected,
+            generator.summarize_bars(self.rows3),
+            date(2026, 7, 13),
+            "day",
+            date(2026, 7, 13),
+        )
+        self.assertEqual(rows[-1].dt.date(), date(2026, 7, 13))
+
+    def test_historical_morning_report_excludes_same_day_completed_daily_bar(self) -> None:
+        rows = generator.daily_rows_for_review(self.daily, date(2026, 7, 13), "morning")
+        self.assertLess(rows[-1].dt.date(), date(2026, 7, 13))
 
     def test_generated_report_is_consistent_and_machine_valid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -220,6 +277,17 @@ class PublisherGateTests(unittest.TestCase):
                 with self.assertRaisesRegex(feishu_publisher.PublishError, "empty document"):
                     feishu_publisher.publish(report, "title", None, no_patch=False)
             self.assertNotIn("飞书在线文档", report.read_text(encoding="utf-8"))
+
+
+class HealthcheckDateTests(unittest.TestCase):
+    def test_morning_preflight_after_2305_targets_next_weekday(self) -> None:
+        current = datetime.fromisoformat("2026-07-23T23:05:00+08:00")
+        self.assertEqual(healthcheck.resolve_target_date("morning", current=current), date(2026, 7, 24))
+
+    def test_explicit_healthcheck_date_is_preserved(self) -> None:
+        explicit = date(2026, 7, 22)
+        current = datetime.fromisoformat("2026-07-23T23:05:00+08:00")
+        self.assertEqual(healthcheck.resolve_target_date("morning", explicit, current), explicit)
 
 
 if __name__ == "__main__":

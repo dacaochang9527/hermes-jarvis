@@ -173,6 +173,15 @@ def validate_report_bundle(
             errors.append(f"正式报告仍含占位内容：{placeholder}")
 
     session = quality.get("session") or {}
+    if quality.get("data_mode") == "live_quote_primary":
+        quote_ohlc = quality.get("quote_ohlc") or {}
+        for session_key, quote_key in (("open", "open"), ("high", "high"), ("low", "low"), ("close", "close")):
+            try:
+                if abs(float(session[session_key]) - float(quote_ohlc[quote_key])) > 0.01:
+                    errors.append(f"夜盘实时quote未成为{session_key}主口径")
+            except (KeyError, TypeError, ValueError):
+                errors.append("夜盘实时quote主口径缺少完整OHLC")
+                break
     plan = quality.get("plan") or {}
     try:
         session_range = max(float(session["high"]) - float(session["low"]), 1.0)
@@ -225,13 +234,33 @@ def validate_report_bundle(
         raise RuntimeError("报告质量门禁失败：" + "；".join(errors))
 
 
-def generate_report(review_date: date, next_date: date, spec: TargetSpec, output: Path, update_levels: bool) -> Path:
+def generate_report(
+    review_date: date,
+    next_date: date,
+    spec: TargetSpec,
+    output: Path,
+    update_levels: bool,
+    force_session_close: bool = False,
+) -> Path:
     output.parent.mkdir(parents=True, exist_ok=True)
-    quote = generator.parse_quote(generator.fetch_text(generator.QUOTE_URL))
     klines = {minutes: generator.fetch_klines(minutes) for minutes in generator.MINUTE_PERIODS}
     daily = generator.fetch_daily()
-    if not generator.bars_for_session(klines.get(3, []), review_date, spec.review_session):
+    session_rows = generator.bars_for_session(klines.get(3, []), review_date, spec.review_session)
+    if not session_rows:
         raise RuntimeError(f"{review_date:%Y-%m-%d} {generator.session_title(spec.review_session)} 3m K线不足，不发布正式报告")
+    live_quote = None
+    try:
+        live_quote = generator.parse_quote(generator.fetch_text(generator.QUOTE_URL))
+    except Exception:
+        if not force_session_close:
+            raise
+    quote = generator.select_review_quote(
+        live_quote,
+        session_rows,
+        review_date,
+        spec.review_session,
+        force_session_close=force_session_close,
+    )
     args = make_generator_args(review_date, next_date, spec, output, update_levels)
     prior_report = generator.find_prior_report(review_date, spec.review_session)
     markdown, prediction_payload = generator.build_report(args, quote, klines, daily, prior_report)
@@ -357,6 +386,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--date", type=parse_yyyymmdd, help="target session date, defaults to today in Asia/Shanghai")
     parser.add_argument("--output-dir", type=Path, help="override report output directory, useful for dry-run tests")
     parser.add_argument("--dry-run", action="store_true", help="generate report and print preview without publishing to Feishu")
+    parser.add_argument("--backfill", action="store_true", help="use the reviewed session's final K-line as the quote anchor")
     parser.add_argument("--no-update-levels", action="store_true", help="do not update runtime latest_prediction_levels.json")
     return parser.parse_args()
 
@@ -369,7 +399,14 @@ def main() -> int:
         review_date, next_date = resolve_dates(spec, target_date)
         output = report_path_for(target_date, spec, args.output_dir)
         previous_url = extract_existing_url(output)
-        report_path = generate_report(review_date, next_date, spec, output, update_levels=(not args.dry_run and not args.no_update_levels))
+        report_path = generate_report(
+            review_date,
+            next_date,
+            spec,
+            output,
+            update_levels=(not args.dry_run and not args.no_update_levels),
+            force_session_close=args.backfill,
+        )
         validate_level_sanity(report_path)
         title = f"PVC2609 {target_date:%Y-%m-%d} {spec.title_session}复盘+预测" + ("（更正版）" if previous_url and not args.dry_run else "")
         published = publish_report(report_path, title, dry_run=args.dry_run)

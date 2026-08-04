@@ -14,6 +14,8 @@ import json
 import math
 import re
 import sys
+import time as time_module
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -90,10 +92,19 @@ def now_cn() -> datetime:
     return datetime.now(TZ)
 
 
-def fetch_text(url: str, timeout: int = 12) -> str:
+def fetch_text(url: str, timeout: int = 12, attempts: int = 3) -> str:
     req = urllib.request.Request(url, headers={"Referer": "https://finance.sina.com.cn/", "User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("gbk", errors="replace")
+    last_error: BaseException | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.read().decode("gbk", errors="replace")
+        except (OSError, TimeoutError, urllib.error.URLError) as exc:
+            last_error = exc
+            if attempt < attempts:
+                time_module.sleep(2 ** (attempt - 1))
+    assert last_error is not None
+    raise last_error
 
 
 def to_float(value: object, default: float = math.nan) -> float:
@@ -215,6 +226,107 @@ def bars_for_session(rows: list[Bar], trading_date: date, session: str) -> list[
     return filtered
 
 
+def quote_belongs_to_session(quote: dict | None, trading_date: date, session: str) -> bool:
+    if not quote:
+        return False
+    quote_dt = quote.get("quote_dt")
+    if not isinstance(quote_dt, datetime) or quote_dt.date() != trading_date:
+        return False
+    session_start = SESSION_WINDOWS[session][0][0]
+    session_end = {
+        "morning": time(11, 40),
+        "day": time(15, 10),
+        "night": time(23, 10),
+    }[session]
+    return session_start <= quote_dt.time() <= session_end
+
+
+def quote_from_session_bars(rows: list[Bar]) -> dict:
+    if not rows or rows[-1].dt is None:
+        raise ValueError("completed session bars are required to build a session-close quote")
+    summary = summarize_bars(rows)
+    return {
+        "name": CONTRACT,
+        "open": summary["open"],
+        "high": summary["high"],
+        "low": summary["low"],
+        "last": summary["close"],
+        "bid": math.nan,
+        "ask": math.nan,
+        "open_interest": summary["oi_end"],
+        "volume": summary["volume"],
+        "quote_dt": rows[-1].dt,
+        "raw": [],
+        "data_mode": "historical_session_close",
+    }
+
+
+def select_review_quote(
+    live_quote: dict | None,
+    rows: list[Bar],
+    trading_date: date,
+    session: str,
+    force_session_close: bool = False,
+) -> dict:
+    session_quote = quote_from_session_bars(rows)
+    if force_session_close or not quote_belongs_to_session(live_quote, trading_date, session):
+        return session_quote
+
+    kline_ohlc = {
+        "open": session_quote["open"],
+        "high": session_quote["high"],
+        "low": session_quote["low"],
+        "close": session_quote["last"],
+    }
+    live_open = value_or(live_quote.get("open", math.nan), session_quote["open"])
+    live_high = value_or(live_quote.get("high", math.nan), session_quote["high"])
+    live_low = value_or(live_quote.get("low", math.nan), session_quote["low"])
+    live_last = value_or(live_quote.get("last", math.nan), session_quote["last"])
+    selected = dict(session_quote)
+    selected.update({
+        "last": live_last,
+        "bid": live_quote.get("bid", math.nan),
+        "ask": live_quote.get("ask", math.nan),
+        "open_interest": value_or(live_quote.get("open_interest", math.nan), session_quote["open_interest"]),
+        "volume": value_or(live_quote.get("volume", math.nan), session_quote["volume"]),
+        "quote_dt": live_quote["quote_dt"],
+        "raw": live_quote.get("raw", []),
+        "kline_ohlc": kline_ohlc,
+        "ohlc_discrepancy": {
+            "open": live_open - kline_ohlc["open"],
+            "high": live_high - kline_ohlc["high"],
+            "low": live_low - kline_ohlc["low"],
+            "close": live_last - kline_ohlc["close"],
+        },
+    })
+    if session == "night":
+        # At 23:00 the quote snapshot describes the just-completed night
+        # session and retains opening-auction/tick extremes that the public 3m
+        # aggregation can omit. It is therefore authoritative for night OHLC.
+        selected.update({
+            "open": live_open,
+            "high": max(live_high, live_open, live_last),
+            "low": min(live_low, live_open, live_last),
+            "data_mode": "live_quote_primary",
+        })
+    else:
+        # During the day session Sina quote high/low can include the preceding
+        # night session. Keep session-local K-line OHL and use only the live
+        # close/quote timestamp.
+        selected["data_mode"] = "live_quote_close_kline_ohlc"
+    return selected
+
+
+def daily_rows_for_review(rows: list[Bar], trading_date: date, session: str) -> list[Bar]:
+    # Historical morning backfills must not see the completed afternoon bar from
+    # the same date. Day/night reviews may use the completed natural-day daily bar.
+    inclusive = session != "morning"
+    return [
+        row for row in rows
+        if row.dt is not None and (row.dt.date() <= trading_date if inclusive else row.dt.date() < trading_date)
+    ]
+
+
 def summarize_bars(rows: list[Bar]) -> dict:
     if not rows:
         return {"open": math.nan, "high": math.nan, "low": math.nan, "close": math.nan, "volume": 0.0, "oi_start": math.nan, "oi_end": math.nan, "oi_delta": math.nan, "start": None, "end": None}
@@ -236,13 +348,11 @@ def value_or(primary: float, fallback: float) -> float:
     return primary if valid_price(primary) else fallback
 
 
-def apply_realtime_night_session_summary(summary: dict, quote: dict, review_date: date, session: str) -> dict:
-    if session != "night":
-        return summary
+def apply_review_quote_to_session_summary(summary: dict, quote: dict, review_date: date, session: str) -> dict:
     quote_dt = quote.get("quote_dt")
     if not isinstance(quote_dt, datetime):
         return summary
-    if quote_dt.date() != review_date or quote_dt.time() < time(21, 0):
+    if quote_dt.date() != review_date:
         return summary
 
     open_ = value_or(quote.get("open", math.nan), summary["open"])
@@ -260,6 +370,10 @@ def apply_realtime_night_session_summary(summary: dict, quote: dict, review_date
         "close": close,
     })
     return realtime
+
+
+# Backward-compatible alias for callers that imported the night-only helper.
+apply_realtime_night_session_summary = apply_review_quote_to_session_summary
 
 
 def apply_realtime_session_daily(
@@ -879,9 +993,10 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
     session_rows_3m = bars_for_session(klines.get(3, []), args.date, args.session)
     session_rows_15m = bars_for_session(klines.get(15, []), args.date, args.session)
     kline_session_summary = summarize_bars(session_rows_3m or klines.get(3, [])[-80:])
-    session_summary = apply_realtime_night_session_summary(kline_session_summary, quote, args.date, args.session)
+    session_summary = apply_review_quote_to_session_summary(kline_session_summary, quote, args.date, args.session)
     next_session = args.next_session or DEFAULT_NEXT_SESSION[args.session]
     next_date = args.next_date or (args.date + timedelta(days=1) if args.session == "night" and next_session == "next_day_day" else args.date)
+    daily = daily_rows_for_review(daily, args.date, args.session)
     daily = apply_realtime_session_daily(daily, quote, session_summary, args.date, args.session, next_date)
     # Key levels must be derived from the reviewed session only.
     # Using all historical 15m bars can promote stale/far resistance into the
@@ -902,6 +1017,18 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
     bias = infer_bias(session_summary, daily, session_rows_3m, session_rows_15m)
     source_doc = relative_report_path(args.output) if args.output else f"reports/{default_report_name(args.date, args.session)}"
     generated_at = now_cn()
+    data_mode = quote.get("data_mode", "live_quote")
+    data_mode_label = {
+        "historical_session_close": "复盘时段K线收盘锚点",
+        "live_quote_primary": "夜盘23:00实时quote主口径 + K线走势校验",
+        "live_quote_close_kline_ohlc": "实时收盘价 + 复盘时段K线开高低",
+        "live_quote": "实时quote",
+    }.get(data_mode, data_mode)
+    discrepancy = quote.get("ohlc_discrepancy") or {}
+    discrepancy_text = " / ".join(
+        f"{float(discrepancy.get(key, 0.0)):+.0f}"
+        for key in ("open", "high", "low", "close")
+    ) if discrepancy else "无实时quote对照"
     quote_stale = "是" if quote["quote_dt"].date() != args.date else "否"
     ma5 = moving_average(daily, 5)
     ma10 = moving_average(daily, 10)
@@ -1008,7 +1135,7 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
 > 复盘对象：{completed_label}  
 > 前序计划：`{relative_report_path(prior_report) if prior_report else '未找到'}`
 > 数据源：新浪期货公开 quote、3m/15m/30m/60m/120m K线、日K、本地事件监控、本地30分钟简报  
-> 数据状态：quote 返回 `{fmt_dt(quote['quote_dt'])}`，当前/收盘参考 `{fmt_price(quote['last'])}`，quote 日期与复盘日期不一致：{quote_stale}  
+> 数据状态：`{data_mode_label}`，时间 `{fmt_dt(quote['quote_dt'])}`，当前/收盘参考 `{fmt_price(quote['last'])}`，日期与复盘日期不一致：{quote_stale}
 > 数据限制：公开行情只有一档盘口，不能还原逐笔主动买卖；K线量仓只用于结构参考，不能直接标注多开/空开/多平/空平。  
 > 风险提示：本文为交易复盘与条件化计划，不构成确定性投资建议；期货杠杆高，必须先设止损。
 
@@ -1031,6 +1158,8 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
 
 | 项目 | 数值 |
 |---|---:|
+| 数据模式 | {data_mode_label} |
+| quote 相对3m差值（开/高/低/收） | {discrepancy_text} |
 | quote 时间 | {fmt_dt(quote['quote_dt'])} |
 | quote 最新/收盘参考 | {fmt_price(quote['last'])} |
 | quote 日内最高 / 最低 | {fmt_price(quote['high'])} / {fmt_price(quote['low'])} |
@@ -1337,6 +1466,14 @@ monitor_levels_updated: {str(args.update_levels).lower()}
         "_quality": {
             "review_date": args.date.isoformat(),
             "quote_dt": quote["quote_dt"].isoformat(),
+            "data_mode": data_mode,
+            "quote_ohlc": {
+                "open": quote["open"],
+                "high": quote["high"],
+                "low": quote["low"],
+                "close": quote["last"],
+            },
+            "ohlc_discrepancy": discrepancy,
             "daily_date": daily[-1].dt.date().isoformat() if daily and daily[-1].dt else None,
             "prior_report": relative_report_path(prior_report) if prior_report else None,
             "bias": bias,
