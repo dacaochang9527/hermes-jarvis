@@ -1,53 +1,53 @@
 {
   "contract": "PVC2609",
-  "source_doc": "reports/pvc2609_20260716_afternoon_preopen_review_forecast.md",
-  "updated_at": "2026-07-16T11:40:56.169535+08:00",
-  "session": "afternoon",
+  "source_doc": "reports/pvc2609_20260805_morning_preopen_review_forecast.md",
+  "updated_at": "2026-08-04T23:10:15.266785+08:00",
+  "session": "morning",
   "levels": [
     {
-      "price": 4590,
+      "price": 4440,
       "role": "support",
       "label": "本阶段低点/再破确认位",
       "direction": "down"
     },
     {
-      "price": 4580,
+      "price": 4430,
       "role": "weakness_confirmation",
       "label": "近端支撑/修复失败观察",
       "direction": "both"
     },
     {
-      "price": 4600,
+      "price": 4445,
       "role": "midline_low",
       "label": "短线中轴下沿",
       "direction": "both"
     },
     {
-      "price": 4605,
+      "price": 4450,
       "role": "resistance",
       "label": "压力区下沿/承压观察",
       "direction": "both"
     },
     {
-      "price": 4625,
+      "price": 4470,
       "role": "core_resistance",
       "label": "核心反抽压力区下沿",
       "direction": "both"
     },
     {
-      "price": 4635,
+      "price": 4480,
       "role": "repair_confirmation",
       "label": "修复延续确认位",
       "direction": "up"
     },
     {
-      "price": 4655,
+      "price": 4500,
       "role": "major_resistance",
       "label": "大级别修复门槛",
       "direction": "up"
     },
     {
-      "price": 4665,
+      "price": 4510,
       "role": "far_resistance",
       "label": "远端强反抽压力下沿",
       "direction": "up"
