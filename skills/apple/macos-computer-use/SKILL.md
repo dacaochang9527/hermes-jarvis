@@ -309,6 +309,22 @@ return "done"
   Cursor's AI runs inside the Electron app; Codex CLI is a standalone
   terminal tool.
 
+## Reading authenticated desktop account data
+
+Use this workflow for brokerage, banking, password-manager, admin-console, or other authenticated native-app pages when the user asks to **read** account information:
+
+1. Capture the target app only and verify the live page state. Prefer `computer_use(action="capture", mode="som", app="…")`; avoid relying on a whole-desktop screenshot when overlapping windows can obscure or contaminate the result.
+2. Distinguish public market/watchlist data from private account data. Never infer holdings from a watchlist, quote panel, recently viewed item, or order-entry symbol.
+3. If authenticated, extract only the requested fields and check whether the table has a scrollbar or clipped rows. Scroll and capture additional rows when necessary, then deduplicate before reporting.
+4. If blocked by password, 2FA, CAPTCHA, keychain authorization, or another identity-verification step, do not read, transcribe, solve, or enter the secret. State the exact remaining user action once.
+5. After reporting an unchanged authentication blocker, do not repeatedly run the same capture-and-report loop. On the next identical request, take one fresh scoped capture to detect a state change; if unchanged, answer in one concise sentence naming the blocker. Do not re-list every unavailable field.
+6. Never treat placeholders such as `--`, an empty unauthenticated table, or a masked account identifier as zero balance, no holdings, or successful login.
+7. Once the user completes authentication, immediately re-capture and read the account data; do not keep repeating the earlier blocker from conversation history.
+
+### AppleScript fallback for scoped capture
+
+When `computer_use` is unavailable, activate the app and use AppleScript/System Events to inspect its frontmost window. Prefer a window-scoped screenshot mechanism when available. If only `screencapture` of the desktop is available, verify visually that the target app is actually visible and do not use text from overlapping chat windows as evidence of the app's current state.
+
 ## When NOT to use `computer_use`
 
 - Web automation you can do via `browser_*` tools — those use a real

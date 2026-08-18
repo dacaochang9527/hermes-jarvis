@@ -78,6 +78,14 @@ references/tulong-feishu-report-publishing.md
 references/tulong-trade-screenshot-entry.md
 ```
 
+当用户要求“读取东方财富账户”、查看东方财富账户汇总或持仓时，加载：
+
+```text
+references/eastmoney-account-reading.md
+```
+
+该流程属于只读账户读取：每次必须重新检查当前界面状态；未登录时定位密码、验证码、错误提示或权限弹窗等具体卡点，不代填认证信息；已登录后读取账户汇总、完整持仓，并排除右侧自选和公开行情。
+
 当涉及 akshare 接口调用细节、消息面复核用哪个 API、参数名陷阱、或盘中行情拉取代码时，加载：
 
 ```text
