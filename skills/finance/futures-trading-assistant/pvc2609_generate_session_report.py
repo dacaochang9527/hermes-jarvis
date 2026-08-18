@@ -513,27 +513,46 @@ def read_jsonl(path: Path, trading_date: date, session: str, limit: int = 8) -> 
 
 
 def find_prior_report(trading_date: date, session: str) -> Path | None:
+    """Locate the formal plan that governed the session being reviewed.
+
+    Prefer the exact prior preopen report for the reviewed session, then fall
+    back along the same-day / recent formal chain so one failed publish cannot
+    permanently break the next sessions.
+    """
+    candidates: list[Path] = []
     if session == "night":
+        # Morning preopen reviews the completed night; prior is that night's plan.
         candidates = [
             REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_night_preopen_review_forecast.md",
             REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_day_review_night_plan.md",
+            REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_afternoon_preopen_review_forecast.md",
+            REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_morning_preopen_review_forecast.md",
         ]
     elif session == "morning":
+        # Afternoon preopen reviews the completed morning; prior is morning plan.
         candidates = [
             REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_morning_preopen_review_forecast.md",
             REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_night_review_next_day_plan.md",
         ]
-        candidates.extend(
-            REPORTS_DIR / f"pvc2609_{trading_date - timedelta(days=offset):%Y%m%d}_night_review_next_day_plan.md"
-            for offset in range(1, 8)
-        )
+        for offset in range(1, 8):
+            previous = trading_date - timedelta(days=offset)
+            candidates.extend(
+                [
+                    REPORTS_DIR / f"pvc2609_{previous:%Y%m%d}_night_preopen_review_forecast.md",
+                    REPORTS_DIR / f"pvc2609_{previous:%Y%m%d}_night_review_next_day_plan.md",
+                    REPORTS_DIR / f"pvc2609_{previous:%Y%m%d}_afternoon_preopen_review_forecast.md",
+                ]
+            )
     else:
+        # Night preopen reviews the completed day; prior is afternoon plan.
         previous = trading_date - timedelta(days=1)
         candidates = [
             REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_afternoon_preopen_review_forecast.md",
             REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_morning_preopen_review_forecast.md",
             REPORTS_DIR / f"pvc2609_{previous:%Y%m%d}_night_review_next_day_plan.md",
             REPORTS_DIR / f"pvc2609_{trading_date:%Y%m%d}_night_review_next_day_plan.md",
+            REPORTS_DIR / f"pvc2609_{previous:%Y%m%d}_night_preopen_review_forecast.md",
+            REPORTS_DIR / f"pvc2609_{previous:%Y%m%d}_afternoon_preopen_review_forecast.md",
         ]
     for path in candidates:
         if path.exists():
@@ -670,6 +689,18 @@ def nearest_5(value: float) -> float:
     if value is None or math.isnan(value):
         return math.nan
     return round(value / 5) * 5
+
+
+def floor_5(value: float) -> float:
+    if value is None or math.isnan(value):
+        return math.nan
+    return math.floor(value / 5.0) * 5.0
+
+
+def ceil_5(value: float) -> float:
+    if value is None or math.isnan(value):
+        return math.nan
+    return math.ceil(value / 5.0) * 5.0
 
 
 def row_at_or_before(rows: list[Bar], marker: time) -> Bar | None:
@@ -868,21 +899,44 @@ def build_plan_levels(levels: dict) -> dict[str, float]:
     low = levels["session_low"]
     high = levels["session_high"]
     close = levels["close"]
-    rounded_low = nearest_5(low)
+    # Floor the session low onto the 5-point grid. nearest_5(4498)=4500 would
+    # round the low *up* onto near resistance and create duplicate monitor prices.
+    rounded_low = floor_5(low)
     support = nearest_5(min(levels["support"], close - 8))
     if support >= rounded_low:
         support = rounded_low - 10
     pivot_low = nearest_5(close)
+    if pivot_low <= rounded_low:
+        pivot_low = rounded_low + 5
     pivot_high = nearest_5(max(close + 5, pivot_low + 5))
+    if pivot_high <= pivot_low:
+        pivot_high = pivot_low + 5
     pressure_low = nearest_5(levels["near_resistance_low"])
-    pressure_high = nearest_5(levels["near_resistance_high"])
-    core_pressure_low = nearest_5(levels["core_resistance_low"])
-    core_pressure_high = nearest_5(levels["core_resistance_high"])
+    # Keep near pressure strictly above the reviewed low so monitor roles stay unique.
+    if pressure_low <= rounded_low:
+        pressure_low = rounded_low + 5
+    pressure_high = nearest_5(max(levels["near_resistance_high"], pressure_low + 10))
+    if pressure_high <= pressure_low:
+        pressure_high = pressure_low + 10
+    core_pressure_low = nearest_5(max(levels["core_resistance_low"], pressure_high + 10))
+    if core_pressure_low <= pressure_high:
+        core_pressure_low = pressure_high + 10
+    core_pressure_high = nearest_5(max(levels["core_resistance_high"], core_pressure_low + 10))
+    if core_pressure_high <= core_pressure_low:
+        core_pressure_high = core_pressure_low + 10
     repair_confirm = core_pressure_high
-    major_resistance = nearest_5(repair_confirm + 20)
+    major_resistance = nearest_5(max(repair_confirm + 20, core_pressure_high + 20))
+    if major_resistance <= repair_confirm:
+        major_resistance = repair_confirm + 20
     far_pressure_low = nearest_5(max(levels["far_resistance_low"], major_resistance + 10))
+    if far_pressure_low <= major_resistance:
+        far_pressure_low = major_resistance + 10
     far_pressure_high = nearest_5(max(levels["far_resistance_high"], far_pressure_low + 10))
+    if far_pressure_high <= far_pressure_low:
+        far_pressure_high = far_pressure_low + 10
     breakdown_target = nearest_5(min(levels["lower_confirm"], rounded_low - 10, support - 10))
+    if breakdown_target >= support:
+        breakdown_target = support - 10
     extreme_target = nearest_5(breakdown_target - 20)
     return {
         "low": rounded_low,
@@ -903,6 +957,29 @@ def build_plan_levels(levels: dict) -> dict[str, float]:
         "extreme_target": extreme_target,
         "high": nearest_5(high),
     }
+
+
+def build_monitor_levels(plan: dict[str, float]) -> list[dict]:
+    """Build monitor levels with unique prices; first role wins on collision."""
+    candidates = [
+        {"price": round(plan["low"]), "role": "support", "label": "本阶段低点/再破确认位", "direction": "down"},
+        {"price": round(plan["support"]), "role": "weakness_confirmation", "label": "近端支撑/修复失败观察", "direction": "both"},
+        {"price": round(plan["pivot_low"]), "role": "midline_low", "label": "短线中轴下沿", "direction": "both"},
+        {"price": round(plan["pressure_low"]), "role": "resistance", "label": "压力区下沿/承压观察", "direction": "both"},
+        {"price": round(plan["core_pressure_low"]), "role": "core_resistance", "label": "核心反抽压力区下沿", "direction": "both"},
+        {"price": round(plan["repair_confirm"]), "role": "repair_confirmation", "label": "修复延续确认位", "direction": "up"},
+        {"price": round(plan["major_resistance"]), "role": "major_resistance", "label": "大级别修复门槛", "direction": "up"},
+        {"price": round(plan["far_pressure_low"]), "role": "far_resistance", "label": "远端强反抽压力下沿", "direction": "up"},
+    ]
+    monitor_levels: list[dict] = []
+    seen: set[int] = set()
+    for item in candidates:
+        price = int(item["price"])
+        if price in seen:
+            continue
+        seen.add(price)
+        monitor_levels.append({**item, "price": price})
+    return monitor_levels
 
 
 def build_scenario_plans(plan: dict[str, float]) -> list[ScenarioPlan]:
@@ -1126,6 +1203,13 @@ def build_report(args: argparse.Namespace, quote: dict, klines: dict[int, list[B
     event_note = f"事件日志 {len(read_jsonl(EVENT_LOG, args.date, args.session, limit=1000))} 条样本；半小时简报 {len(read_jsonl(BRIEFING_LOG, args.date, args.session, limit=1000))} 条样本。"
 
     prior_levels_text = "、".join(prior_mentions[:10]) if prior_mentions else "未从前序文档提取到清晰点位"
+    if prior_mentions:
+        invalidated_levels_md = (
+            f"  - price: {prior_mentions[0]}\n"
+            "    reason: 若已被本阶段刺破/收回，单独作为触发信号权重下降，需结合确认链使用"
+        )
+    else:
+        invalidated_levels_md = "  []"
 
     markdown = f"""# PVC2609 {completed_label}复盘 + {next_label}计划
 
@@ -1438,24 +1522,13 @@ must_watch_levels:
     label: 大级别修复门槛
     trigger: reclaim_or_fail
 invalidated_levels:
-  - price: {prior_mentions[0] if prior_mentions else 'TBD'}
-    reason: 若已被本阶段刺破/收回，单独作为触发信号权重下降，需结合确认链使用
+{invalidated_levels_md}
 {scenario_handoff_md}
 monitor_levels_updated: {str(args.update_levels).lower()}
 ```
 """
 
-    monitor_levels = [
-        {"price": round(plan["low"]), "role": "support", "label": "本阶段低点/再破确认位", "direction": "down"},
-        {"price": round(plan["support"]), "role": "weakness_confirmation", "label": "近端支撑/修复失败观察", "direction": "both"},
-        {"price": round(plan["pressure_low"]), "role": "resistance", "label": "压力区下沿/承压观察", "direction": "both"},
-        {"price": round(plan["core_pressure_low"]), "role": "core_resistance", "label": "核心反抽压力区下沿", "direction": "both"},
-        {"price": round(plan["repair_confirm"]), "role": "repair_confirmation", "label": "修复延续确认位", "direction": "up"},
-        {"price": round(plan["major_resistance"]), "role": "major_resistance", "label": "大级别修复门槛", "direction": "up"},
-        {"price": round(plan["far_pressure_low"]), "role": "far_resistance", "label": "远端强反抽压力下沿", "direction": "up"},
-    ]
-    if round(plan["pivot_low"]) not in {item["price"] for item in monitor_levels}:
-        monitor_levels.insert(2, {"price": round(plan["pivot_low"]), "role": "midline_low", "label": "短线中轴下沿", "direction": "both"})
+    monitor_levels = build_monitor_levels(plan)
 
     prediction_payload = {
         "contract": CONTRACT,

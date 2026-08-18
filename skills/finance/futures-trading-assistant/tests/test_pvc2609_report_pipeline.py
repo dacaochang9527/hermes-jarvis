@@ -82,6 +82,35 @@ class GeneratorRegressionTests(unittest.TestCase):
         self.assertEqual((plan["core_pressure_low"], plan["core_pressure_high"]), (4510, 4520))
         self.assertEqual((plan["far_pressure_low"], plan["far_pressure_high"]), (4585, 4595))
 
+    def test_close_at_low_does_not_duplicate_monitor_prices(self) -> None:
+        """Regression: nearest_5(4498)=4500 used to collide with near resistance."""
+        summary = {
+            "open": 4539.0, "high": 4544.0, "low": 4498.0, "close": 4498.0,
+            "volume": 1.0, "open_interest": 1.0,
+        }
+        quote = {**self.quote, "open": 4539.0, "high": 4544.0, "low": 4498.0, "last": 4498.0}
+        plan = generator.build_plan_levels(generator.derive_levels(summary, quote, self.rows15))
+        prices = [item["price"] for item in generator.build_monitor_levels(plan)]
+        self.assertEqual(plan["low"], 4495)
+        self.assertLess(plan["low"], plan["pressure_low"])
+        self.assertEqual(len(prices), len(set(prices)), prices)
+        self.assertNotIn("TBD", "\n".join(str(item) for item in prices))
+
+    def test_prior_report_falls_back_to_same_day_afternoon(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            afternoon = root / "pvc2609_20260810_afternoon_preopen_review_forecast.md"
+            afternoon.write_text("prior", encoding="utf-8")
+            with patch.object(generator, "REPORTS_DIR", root):
+                self.assertEqual(
+                    generator.find_prior_report(date(2026, 8, 10), "night"),
+                    afternoon,
+                )
+                self.assertEqual(
+                    generator.find_prior_report(date(2026, 8, 11), "morning"),
+                    afternoon,
+                )
+
     def test_prior_scenarios_follow_trigger_then_confirmation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             prior = Path(tmp) / "prior.md"

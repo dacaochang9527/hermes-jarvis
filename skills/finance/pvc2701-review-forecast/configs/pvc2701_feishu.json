@@ -10,7 +10,10 @@
   "schedules": {
     "afternoon": "40 11 * * 1-5",
     "night": "10 15 * * 1-5",
-    "morning": "10 23 * * 1-5"
-  }
+    "morning": "10 23 * * 1-5",
+    "intraday": "*/3 9-15,21-23 * * 1-5",
+    "healthcheck": "5,35 11,15,23 * * 1-5"
+  },
+  "healthcheck_deliver": "feishu:ou_29f43af572af5354dcf63c44af9ca013"
 }
 

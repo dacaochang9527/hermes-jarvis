@@ -63,6 +63,8 @@ metadata:
 
 ## 报告链与时间
 
+- 交易时段每 3 分钟：若 3m 收盘有效穿越最新计划关键位，生成盘中操作重估并更新监控位。
+- 11:35 / 15:05 / 23:05：自动化预检；全部通过则静默，失败才私聊告警。
 - 11:40：复盘上午盘，预测午盘，目标 `afternoon`。
 - 15:10：复盘完整日盘，预测夜盘，目标 `night`。
 - 23:10：复盘夜盘，预测下一日盘，目标 `morning`。
@@ -72,6 +74,17 @@ metadata:
 - `reports/pvc2701_YYYYMMDD_afternoon_preopen_review_forecast.md`
 - `reports/pvc2701_YYYYMMDD_night_preopen_review_forecast.md`
 - `reports/pvc2701_YYYYMMDD_morning_preopen_review_forecast.md`
+- `reports/pvc2701_YYYYMMDD_intraday_<session>_<HHMM>_key_level_break_<up|down>_<price>.md`
+
+定时任务：
+
+| 任务 | 时间 | 脚本 | 投递 |
+|------|------|------|------|
+| 盘中关键位操作重估 | `*/3 9-15,21-23 * * 1-5` | `pvc2701_intraday_key_level_report.sh` | 群 `pvc2701` |
+| 上午收盘后午盘复盘 | `40 11 * * 1-5` | `pvc2701_afternoon_review_report.sh` | 群 `pvc2701` |
+| 日盘收盘后夜盘复盘 | `10 15 * * 1-5` | `pvc2701_night_review_report.sh` | 群 `pvc2701` |
+| 夜盘收盘后次日日盘复盘 | `10 23 * * 1-5` | `pvc2701_morning_review_report.sh` | 群 `pvc2701` |
+| 自动化预检 | `5,35 11,15,23 * * 1-5` | `pvc2701_automation_healthcheck.sh` | 个人账号，失败才发 |
 
 ## 命令入口
 
@@ -91,6 +104,18 @@ python pvc2701_bootstrap_publish.py --target afternoon|night|morning --date YYYY
 
 ```bash
 python pvc2701_review_publish.py --target afternoon|night|morning --date YYYYMMDD
+```
+
+盘中关键位触发重估（无穿越则静默）：
+
+```bash
+python pvc2701_intraday_key_level_report.py
+```
+
+正式发布前预检（通过则静默；`--verbose` 打印成功摘要）：
+
+```bash
+python pvc2701_automation_healthcheck.py --target auto
 ```
 
 上述发布脚本只输出群消息正文；定时任务由 Hermes Cron 投递。一次性立即发群时，用 `send_feishu_group.py --message-file <file>`，该脚本的目标群固定且不可由命令行覆盖。
