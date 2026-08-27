@@ -48,7 +48,7 @@ Trading-session changes for Feishu futures monitors, including day + night cron/
 
 Pre-open guard check design is documented in `references/preopen-guard-checks.md`.
 
-Local Markdown report to Feishu online document publishing workflow is documented in `references/feishu-report-publishing.md`. Feishu API limits and workarounds (1000-block cap, chunking failures, pre-conversion trimming) are documented in `references/feishu-publishing-limits.md`.
+Local Markdown report to Feishu online document publishing workflow, including the additional standalone HTML attachment sent with the group message, is documented in `references/feishu-report-publishing.md`. Feishu API limits and workarounds (1000-block cap, chunking failures, pre-conversion trimming) are documented in `references/feishu-publishing-limits.md`.
 
 Reusable futures report structure benchmarks, including time-slice forecast-vs-actual tables, error/logic-adjustment tables, top-down multi-timeframe summaries, and small-account point feasibility, are documented in `references/report-structure-benchmarks.md`.
 
@@ -203,6 +203,9 @@ When the user asks to save a futures report and make it available in Feishu, tre
 3. After the Feishu document is created and its final URL is known, immediately patch the local Markdown metadata block near the top with a line like `> 飞书在线文档：https://...`.
 4. If the Feishu document is later copied/recreated/retitled and the URL changes, patch the local Markdown link to the final retained URL and delete or ignore superseded URLs.
 5. Only then send the final Feishu document link to the group when the user asks for group delivery.
+6. For scheduled futures review publishing, render the canonical Markdown as a same-name standalone `.html` file **after** the Feishu URL has been patched, and include its absolute `MEDIA:` path in the group output so Hermes cron delivery sends it as an attachment.
+7. Keep the existing Feishu online document as the primary reading entry. The HTML is an additive attachment for external viewers; do not replace or redesign the established docx publishing chain when attachment-only delivery satisfies the request.
+8. Distinguish delivery paths: Hermes/cron output understands `MEDIA:/absolute/path/report.html`; a custom script that directly calls Feishu `im/v1/messages` with `msg_type=text` does not upload that file automatically and needs a separate file-upload/file-message implementation or the platform `send_message` media path.
 
 This keeps the local report as the durable source of truth while preserving a direct pointer to the online Feishu version.
 

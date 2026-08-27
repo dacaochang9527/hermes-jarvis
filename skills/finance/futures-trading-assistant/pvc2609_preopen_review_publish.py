@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import re
@@ -363,7 +364,63 @@ def extract_summary(markdown_path: Path) -> str:
     return summary[:180] + ("..." if len(summary) > 180 else "")
 
 
-def build_group_message(title: str, url: str, summary: str, local_path: Path, dry_run: bool, previous_url: str | None = None) -> str:
+def render_html_attachment(markdown_path: Path, title: str) -> Path:
+    """Render a standalone UTF-8 HTML attachment beside the canonical report."""
+    try:
+        from markdown_it import MarkdownIt
+    except ImportError as exc:
+        raise RuntimeError("缺少 markdown-it-py，无法生成 HTML 附件") from exc
+
+    markdown = markdown_path.read_text(encoding="utf-8")
+    body = MarkdownIt("commonmark", {"html": False, "linkify": True, "typographer": True}).enable("table").render(markdown)
+    document = f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{html.escape(title)}</title>
+  <style>
+    :root {{ color-scheme: light; --ink:#172033; --muted:#667085; --line:#d8dee9; --accent:#155eef; --panel:#f7f9fc; }}
+    * {{ box-sizing: border-box; }}
+    body {{ margin:0; background:#eef2f7; color:var(--ink); font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }}
+    main {{ width:min(1180px, calc(100% - 32px)); margin:24px auto; padding:36px 44px 56px; background:#fff; border:1px solid var(--line); border-radius:14px; box-shadow:0 10px 30px rgba(20,35,60,.08); }}
+    h1,h2,h3 {{ line-height:1.35; color:#101828; scroll-margin-top:16px; }}
+    h1 {{ margin-top:0; font-size:30px; border-bottom:3px solid var(--accent); padding-bottom:14px; }}
+    h2 {{ margin-top:34px; font-size:22px; border-left:4px solid var(--accent); padding-left:10px; }}
+    h3 {{ margin-top:24px; font-size:18px; }}
+    a {{ color:var(--accent); overflow-wrap:anywhere; }}
+    blockquote {{ margin:16px 0; padding:12px 16px; color:#344054; background:var(--panel); border-left:4px solid #84adff; }}
+    table {{ width:100%; border-collapse:collapse; margin:16px 0 24px; font-size:14px; display:block; overflow-x:auto; }}
+    th,td {{ min-width:110px; padding:9px 11px; border:1px solid var(--line); text-align:left; vertical-align:top; }}
+    th {{ background:#edf3ff; color:#1d2939; font-weight:650; }}
+    tr:nth-child(even) td {{ background:#fafbfc; }}
+    code {{ padding:2px 5px; border-radius:5px; background:#f2f4f7; color:#b42318; }}
+    pre {{ padding:16px; overflow:auto; border-radius:9px; background:#101828; color:#f2f4f7; }}
+    pre code {{ padding:0; background:transparent; color:inherit; }}
+    hr {{ border:0; border-top:1px solid var(--line); margin:28px 0; }}
+    @media (max-width:700px) {{ main {{ width:100%; margin:0; padding:22px 16px 40px; border:0; border-radius:0; }} h1 {{ font-size:25px; }} h2 {{ font-size:20px; }} }}
+    @media print {{ body {{ background:#fff; }} main {{ width:100%; margin:0; border:0; box-shadow:none; }} }}
+  </style>
+</head>
+<body><main>{body}</main></body>
+</html>
+"""
+    html_path = markdown_path.with_suffix(".html")
+    atomic_write_text(html_path, document)
+    if html_path.stat().st_size <= 0 or "<main>" not in html_path.read_text(encoding="utf-8"):
+        raise RuntimeError("HTML 附件生成后校验失败")
+    return html_path
+
+
+def build_group_message(
+    title: str,
+    url: str,
+    summary: str,
+    local_path: Path,
+    dry_run: bool,
+    previous_url: str | None = None,
+    html_path: Path | None = None,
+) -> str:
     prefix = "[DRY-RUN] " if dry_run else ""
     lines = []
     if previous_url and not dry_run:
@@ -377,6 +434,8 @@ def build_group_message(title: str, url: str, summary: str, local_path: Path, dr
         f"摘要：{summary}",
         f"本地文件：{local_path}",
     ])
+    if html_path is not None:
+        lines.extend(["HTML 格式附件：", f"MEDIA:{html_path.resolve()}"])
     return "\n".join(lines)
 
 
@@ -413,7 +472,8 @@ def main() -> int:
         url = published.get("url") or published.get("document_url") or "URL生成失败"
         if not args.dry_run and not str(url).startswith("http"):
             raise RuntimeError("飞书文档发布未返回有效 URL")
-        print(build_group_message(title, url, extract_summary(report_path), report_path, args.dry_run, previous_url))
+        html_path = render_html_attachment(report_path, title)
+        print(build_group_message(title, url, extract_summary(report_path), report_path, args.dry_run, previous_url, html_path))
         return 0
     except Exception as exc:
         print(f"PVC2609 {target_date:%Y-%m-%d} {spec.title_session}复盘+预测未发布：{exc}")

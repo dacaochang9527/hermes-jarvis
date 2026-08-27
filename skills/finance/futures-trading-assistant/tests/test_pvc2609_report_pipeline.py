@@ -230,6 +230,25 @@ class GeneratorRegressionTests(unittest.TestCase):
 
 
 class PublisherGateTests(unittest.TestCase):
+    def test_html_attachment_is_standalone_and_group_message_contains_media(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "report.md"
+            report.write_text(
+                "# PVC2701 测试报告\n\n> 飞书在线文档：https://example.test/doc  \n\n"
+                "## 关键位\n\n| 类型 | 点位 |\n|---|---:|\n| 支撑 | 4500 |\n",
+                encoding="utf-8",
+            )
+            html_path = publisher.render_html_attachment(report, "PVC2701 测试报告")
+            rendered = html_path.read_text(encoding="utf-8")
+            self.assertTrue(html_path.exists())
+            self.assertIn('<meta charset="utf-8">', rendered)
+            self.assertIn("<table>", rendered)
+            self.assertIn("https://example.test/doc", rendered)
+            message = publisher.build_group_message(
+                "PVC2701 测试报告", "https://example.test/doc", "摘要", report, False, html_path=html_path
+            )
+            self.assertIn(f"MEDIA:{html_path.resolve()}", message)
+
     def test_bad_short_target_is_rejected(self) -> None:
         quality = {
             "review_date": "2026-07-13", "quote_dt": "2026-07-13T15:04:28+08:00",

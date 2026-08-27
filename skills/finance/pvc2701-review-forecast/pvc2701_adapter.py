@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sys
 import types
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -45,6 +46,183 @@ WRAPPER_SCRIPTS = set(PREOPEN_SCRIPTS.values()) | {
     "pvc2701_intraday_key_level_report.sh",
     "pvc2701_automation_healthcheck.sh",
 }
+
+
+def _price_mentions(value: object) -> list[float]:
+    return [float(item) for item in re.findall(r"(?<!\d)(4\d{3})(?!\d)", str(value or ""))]
+
+
+def _state_handoff_scenarios(path: Path | None) -> dict[str, dict[str, object]]:
+    """Read executable anchors from STATE_HANDOFF instead of prose numbers."""
+    if path is None or not path.exists():
+        return {}
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    handoff_at = text.rfind("STATE_HANDOFF")
+    if handoff_at < 0:
+        return {}
+    handoff = text[handoff_at:]
+    scenarios: dict[str, dict[str, object]] = {}
+    for match in re.finditer(
+        r"(?ms)^  - id:\s*([A-D])\s*$\n(.*?)(?=^  - id:\s*[A-E]\s*$|^monitor_levels_updated:|\Z)",
+        handoff,
+    ):
+        scenario_id, body = match.groups()
+        fields: dict[str, str] = {}
+        for line in body.splitlines():
+            field = re.match(r"^    ([a-z_]+):\s*(.+?)\s*$", line)
+            if field:
+                fields[field.group(1)] = field.group(2)
+        scenarios[scenario_id] = {
+            "direction": fields.get("direction"),
+            "entry_levels": _price_mentions(fields.get("entry")),
+            "invalidation_levels": _price_mentions(fields.get("invalidation")),
+        }
+    return scenarios
+
+
+def _bind_generator_integrity(module: types.ModuleType) -> None:
+    """Apply PVC2701-only conservative scenario parsing and validation."""
+    original_extract = module.extract_prior_scenarios
+
+    def extract_prior_scenarios(path: Path | None) -> list[dict[str, object]]:
+        scenarios = original_extract(path)
+        handoff = _state_handoff_scenarios(path)
+        for scenario in scenarios:
+            state = handoff.get(str(scenario.get("scenario_id") or ""))
+            if not state:
+                continue
+            if state.get("direction"):
+                scenario["direction"] = state["direction"]
+            if state.get("entry_levels"):
+                scenario["entry_levels"] = state["entry_levels"]
+            if state.get("invalidation_levels"):
+                scenario["invalidation_levels"] = state["invalidation_levels"]
+        return scenarios
+
+    def evaluate_scenario(scenario: dict[str, object], rows_3m: list[object], summary: dict) -> tuple[str, str, str]:
+        """Require a completed-close trigger and chronological confirmation.
+
+        A range touch alone is not a trigger.  Breakdown scenarios must close
+        below their anchor; repair scenarios must close above it.  This keeps
+        a 4440 intrabar low from falsely satisfying a "close below 4435" plan.
+        """
+        rows = [row for row in rows_3m if getattr(row, "dt", None) is not None]
+        entry_levels = [
+            float(value)
+            for value in scenario.get("entry_levels", [])
+            if module.valid_price(float(value))
+        ]
+        invalidation_levels = [
+            float(value)
+            for value in scenario.get("invalidation_levels", [])
+            if module.valid_price(float(value))
+        ]
+        if not rows or not entry_levels:
+            return (
+                "未触发",
+                "前序方案缺少可验证的完成K线或执行锚点，不能事后补写命中",
+                "保留为未触发并降级到人工复核",
+            )
+
+        direction = str(scenario.get("direction") or "range")
+        name = str(scenario.get("name") or "")
+        rejection_short = direction == "short" and "承压" in name
+        zone_low, zone_high = min(entry_levels), max(entry_levels)
+        trigger_index: int | None = None
+        confirm_index: int | None = None
+
+        if rejection_short:
+            touch_index = next((i for i, row in enumerate(rows) if row.high >= zone_low), None)
+            if touch_index is not None:
+                trigger_index = touch_index
+                confirm_index = next(
+                    (i for i in range(touch_index, len(rows)) if rows[i].close < zone_low),
+                    None,
+                )
+        elif direction == "long":
+            anchor = zone_low
+            trigger_index = next((i for i, row in enumerate(rows) if row.close > anchor), None)
+            if trigger_index is not None:
+                invalidation = min(invalidation_levels) if invalidation_levels else anchor
+                confirm_index = next(
+                    (
+                        i
+                        for i in range(trigger_index + 1, len(rows))
+                        if rows[i].low > invalidation and rows[i].close >= anchor
+                    ),
+                    None,
+                )
+        else:
+            anchor = zone_low
+            trigger_index = next((i for i, row in enumerate(rows) if row.close < anchor), None)
+            if trigger_index is not None:
+                confirm_index = next(
+                    (
+                        i
+                        for i in range(trigger_index + 1, len(rows))
+                        if rows[i].high >= anchor - 2 and rows[i].close < anchor
+                    ),
+                    None,
+                )
+
+        if trigger_index is None:
+            return (
+                "未触发",
+                f"没有完成K线满足前序触发锚点 {module.fmt_price(zone_low)}",
+                "盘中刺破或触碰不算触发，不做事后归因",
+            )
+        if confirm_index is None:
+            return (
+                "部分触发",
+                "完成K线到达触发条件，但尚未出现后续回踩/反抽确认",
+                "继续等待确认，不把单根K线写成命中",
+            )
+
+        after_trigger = rows[trigger_index:]
+        invalidated = False
+        if invalidation_levels:
+            if direction == "long":
+                invalidation = min(invalidation_levels)
+                invalidated = any(row.close < invalidation for row in after_trigger[1:])
+            else:
+                invalidation = max(invalidation_levels)
+                invalidated = any(row.close > invalidation for row in after_trigger[1:])
+        if invalidated:
+            return (
+                "触发后失败",
+                "触发和确认后，完成K线又越过前序失效位",
+                "按失效处理，不把盘中一度有利写成最终命中",
+            )
+        return (
+            "触发且确认",
+            "完成K线触发后又出现了按时间顺序的回踩/反抽确认",
+            "计划有效，执行仍须使用独立止损和目标",
+        )
+
+    module.extract_prior_scenarios = extract_prior_scenarios
+    module.evaluate_scenario = evaluate_scenario
+
+
+def _bind_intraday_integrity(module: types.ModuleType, generator: types.ModuleType) -> None:
+    """Exclude a Sina bar whose labelled end time is later than quote time."""
+    original_parse_quote = generator.parse_quote
+    original_session_rows = module.bars_for_intraday_session
+
+    def parse_quote(raw: str) -> dict:
+        quote = original_parse_quote(raw)
+        module._pvc2701_quote_cutoff = quote.get("quote_dt")
+        return quote
+
+    def completed_session_rows(rows: list[object], trading_date: object, session: str) -> list[object]:
+        session_rows = original_session_rows(rows, trading_date, session)
+        cutoff = getattr(module, "_pvc2701_quote_cutoff", None)
+        if cutoff is None:
+            cutoff = module.now_cn()
+        return [row for row in session_rows if row.dt is None or row.dt <= cutoff]
+
+    generator.parse_quote = parse_quote
+    module.bars_for_intraday_session = completed_session_rows
+    module.completed_session_rows = completed_session_rows
 
 
 def _transform(source: str) -> str:
@@ -86,6 +264,7 @@ def load_generator() -> types.ModuleType:
     module.EVENT_LOG = module.RUNTIME_DIR / "events.jsonl"
     module.BRIEFING_LOG = module.RUNTIME_DIR / "half_hour_briefings.jsonl"
     module.PREDICTION_LEVELS_PATH = module.RUNTIME_DIR / "latest_prediction_levels.json"
+    _bind_generator_integrity(module)
     return module
 
 
@@ -125,6 +304,7 @@ def load_intraday() -> types.ModuleType:
         SKILL_DIR / "pvc2701_intraday_key_level_report.py",
     )
     module.generator = generator
+    _bind_intraday_integrity(module, generator)
     sys.modules["pvc2701_intraday_key_level_report"] = module
     return module
 

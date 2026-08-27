@@ -80,3 +80,8 @@ hermes-agent/.git.embedded-backup/
 .playwright-mcp/
 
 cron/jobs.json
+
+data/
+
+/skills/finance/pvc2701-review-forecast/reports/
+/skills/finance/pvc2701-review-forecast/runtime/

@@ -216,9 +216,16 @@ Use the `image_generate` tool with the assembled prompt from Step 5.
 - On failure, auto-retry once
 - Save the resulting image URL/path to the output directory
 
-### Step 7: Output Summary
+### Step 7: Output Summary and Delivery Verification
 
 Report: topic, layout, style, aspect, language, output path, files created.
+
+When the request comes from a messaging gateway and the user wants the infographic sent in chat:
+1. Verify the final image exists at a persistent absolute path accessible to the gateway host; do not reuse a generator/container-only temporary path such as `/mnt/data/...` without copying it locally first.
+2. Validate the rendered image before delivery: correct dimensions/aspect, all sections visible, Chinese text legible, and no horizontal or vertical clipping. Use image analysis when available.
+3. Send the actual attachment with `MEDIA:<absolute_path>` or the platform messaging tool. A text reply saying “已生成/已发送” is not delivery.
+4. Require an authoritative success signal such as a messaging `message_id`. If the user still cannot see it, inspect platform logs and distinguish text-send success from media-upload success.
+5. If media delivery failed, fix the path/artifact and explicitly attach it again; a later text-only message does not retry the previous media.
 
 ## References
 

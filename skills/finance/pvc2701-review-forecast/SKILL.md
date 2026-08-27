@@ -50,7 +50,8 @@ metadata:
 6. 运行质量门禁；日期错位、前序缺失（非首期）、关键位层级异常、止损止盈方向错误时禁止发布。
 7. 将正式报告保存到本 Skill 的 `reports/`，并更新 `runtime/pvc2701_feishu_monitor/latest_prediction_levels.json`。
 8. 创建飞书在线文档，验证 raw content 非空，回写本地 Markdown 的在线文档 URL。
-9. 用户要求发群或任务是已授权的 PVC2701 定时发布时，只把标题、摘要和最终文档链接发送到固定群。
+9. 从已回写 URL 的 Markdown 生成同名独立 HTML；HTML 使用内嵌样式，不依赖外部资源。
+10. 用户要求发群或任务是已授权的 PVC2701 定时发布时，把标题、摘要、最终文档链接和 HTML 附件发送到固定群。
 
 ## 首期建档规则
 
@@ -63,6 +64,8 @@ metadata:
 
 ## 报告链与时间
 
+- 盘中触发只允许使用已经完成的 K 线。新浪分钟 K 的时间标签按该根 K 的结束时间处理；若 K 线时间晚于 quote 时间，必须过滤，禁止把当前未完成 K 写成“3m 收盘触发”。
+- 前序方案复盘必须从 `STATE_HANDOFF.scenarios` 读取入场锚点和失效位，并按“完成 K 触发 → 后续回踩/反抽确认 → 是否越过失效位”的时间顺序判定；盘中刺破或聚合 OHLC 触碰不能直接算命中。
 - 交易时段每 3 分钟：若 3m 收盘有效穿越最新计划关键位，生成盘中操作重估并更新监控位。
 - 11:35 / 15:05 / 23:05：自动化预检；全部通过则静默，失败才私聊告警。
 - 11:40：复盘上午盘，预测午盘，目标 `afternoon`。
@@ -118,7 +121,7 @@ python pvc2701_intraday_key_level_report.py
 python pvc2701_automation_healthcheck.py --target auto
 ```
 
-上述发布脚本只输出群消息正文；定时任务由 Hermes Cron 投递。一次性立即发群时，用 `send_feishu_group.py --message-file <file>`，该脚本的目标群固定且不可由命令行覆盖。
+上述发布脚本输出群消息正文，并在 HTML 生成成功后追加 `MEDIA:` 绝对路径；定时任务由 Hermes Cron 解析并投递文档摘要与 HTML 附件。一次性立即发群时，优先使用支持 `MEDIA:` 的平台发送链路。现有 `send_feishu_group.py --message-file <file>` 只直发 `msg_type=text`，不会解析或上传 `MEDIA:` 文件；若必须使用该脚本发送附件，应先扩展为“上传文件取得 `file_key` → 发送 `msg_type=file`”，不能把含 `MEDIA:` 的文本发送成功当成附件成功。
 
 ## 风险与数据限制
 
@@ -130,9 +133,11 @@ python pvc2701_automation_healthcheck.py --target auto
 
 ## 完成检查
 
+- [ ] 盘中触发 K 的结束时间不晚于 quote 时间；未来标签 K 已被过滤。
+- [ ] A/B/C/D 的触发锚点来自 `STATE_HANDOFF.scenarios`，复盘结论通过顺序条件验证，而非仅比较全时段最高/最低。
 - [ ] 报告和运行目录均为 `pvc2701`，未覆盖 `pvc2609`。
 - [ ] quote 与复盘日期一致，或已明确使用历史时段收盘锚点。
 - [ ] 3m/15m/30m/60m/120m/日 K 已抓取或标记缺失。
 - [ ] A/B/C/D/E 含入场、失效、止损/目标和观望条件。
-- [ ] 飞书文档 raw content 非空，本地报告已回写 URL。
+- [ ] 飞书文档 raw content 非空，本地报告已回写 URL；同名 HTML 已生成且群消息含 `MEDIA:` 附件路径。
 - [ ] 投递目标严格等于 `pvc2701 / oc_d5aa041b453e9b6f8a38fba75fa94b37`。

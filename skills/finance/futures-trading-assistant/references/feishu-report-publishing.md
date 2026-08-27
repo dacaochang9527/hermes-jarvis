@@ -8,7 +8,8 @@
 2. 用飞书 bot 凭证创建 docx 文档，并写入报告内容。
 3. 生成最终文档 URL 后，回写到本地 Markdown 头部元信息。
 4. 用 SDK 或 API 读取 raw content 验证在线文档内容非空。
-5. 将最终 URL 发到期货飞书群。
+5. 从已回写飞书 URL 的 canonical Markdown 生成同名、独立可打开的 UTF-8 HTML 文件。
+6. 将最终 URL 和 HTML 文件作为附件一并发到期货飞书群。
 
 ## 本地报告格式
 
@@ -36,6 +37,20 @@ Markdown 顶部建议保留：
 ```
 
 脚本会自动完成：读取本地 Markdown、创建 bot-owned docx、调用官方 Markdown converter、用 descendant API 插入层级 blocks、设置公司内链接可读、验证 metadata URL，并回写本地 Markdown 的 `> 飞书在线文档：...` 行。默认不发群；群发送必须单独执行。
+
+正式复盘发布器 `pvc2609_preopen_review_publish.py`（PVC2701 通过 adapter 复用）会在飞书文档发布和 URL 回写成功后，自动把 canonical Markdown 渲染为同目录同名 `.html`。HTML 使用内嵌 CSS、不依赖外部静态资源，并在 cron 输出中追加 `MEDIA:/absolute/path/report.html`，由 Hermes 将其作为飞书附件随群消息投递。飞书在线文档仍是主阅读入口，HTML 是方便外部人员下载查看的附加格式。
+
+## HTML 附件的最小改动原则
+
+当用户只要求“在目前飞书文档基础上附一个 HTML”时：
+
+1. 不改飞书 docx 创建、质量门禁、URL 回写和群摘要结构；只在成功闭环后增加 HTML 渲染与附件投递。
+2. HTML 必须从**已回写最终飞书 URL 的 canonical Markdown**生成，确保附件内链接与群里链接一致。
+3. 使用同目录、同文件名 stem 的 `.html`，内嵌 CSS，禁用原始 HTML 注入，不依赖 CDN、图片域名或脚本资源。
+4. 生成后检查文件非空、含 UTF-8 charset、正文 `<main>`；报告有 Markdown 表格时还应确认转换后存在 `<table>`。
+5. Hermes cron/no-agent 的 stdout 可用单独一行 `MEDIA:/absolute/path/file.html` 触发原生附件投递。不要把这一语法误认为飞书 OpenAPI 的文本消息也会自动上传文件。
+6. 若走自定义 `send_feishu_group.py` 直调 OpenAPI，必须先上传文件取得 `file_key`，再发送 `msg_type=file`；仅把 `MEDIA:` 写进 `msg_type=text` 只会发送普通文字。
+7. HTML 生成失败应使该次“文档+附件”发布结果明确失败或未完成，不能声称附件已经发送；飞书文档已创建时需报告该部分状态，避免把两个层级混为一个成功结果。
 
 发布后仍要用 `grep`/`search_files` 或 `read_file` 验证本地 Markdown 头部确实出现 `> 飞书在线文档：...`。若报告头部使用 `> 复盘时间：...` 而不是 `> 生成时间：...`，旧脚本可能返回 `patched_local_report=true` 但没有实际插入链接；此时必须手动 patch 到元信息区，并后续修正脚本兼容逻辑。
 
@@ -145,7 +160,14 @@ assert len(resp.data.content or '') > 0
 
 `feishu:oc_3b94cfb91274b70374954d7b12f12432`
 
-发送内容保持简短：标题、链接、核心观察点即可。不要把整篇报告粘到群里。
+发送内容保持简短：标题、链接、核心观察点和 HTML 附件即可。不要把整篇报告粘到群里。
+
+附件发布前应验证：
+
+- `.html` 文件存在且大小大于 0；
+- 文件包含 UTF-8 charset、正文 `<main>` 和报告表格；
+- 群消息输出含 `MEDIA:` 绝对路径；
+- 不在 HTML 内嵌 app secret、tenant token 或本机环境变量。
 
 ## 注意事项
 
